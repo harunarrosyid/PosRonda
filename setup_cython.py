@@ -29,7 +29,7 @@ extensions = [
 
 setup(
     name="posronda-core",
-    version="4.3.0",
+    version="4.3.1",
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     ext_modules=cythonize(

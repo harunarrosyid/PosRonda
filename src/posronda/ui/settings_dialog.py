@@ -114,6 +114,10 @@ class SettingsDialog(tk.Toplevel):
         self.scanned_cams = []
         self.cam_entries = []
 
+        self.protocol("WM_DELETE_WINDOW", self.on_close_dialog)
+        self.bind("<Control-s>", lambda e: self.save_all())
+        self.bind("<Control-S>", lambda e: self.save_all())
+
         self.create_widgets()
 
     def create_widgets(self):
@@ -182,45 +186,9 @@ class SettingsDialog(tk.Toplevel):
             foreground=[("selected", "#ffffff")]
         )
 
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill="both", expand=True, padx=14, pady=10)
-
-        # Tab 1: Kamera CCTV (Auto-Scan & Patrol)
-        tab_cam = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_cam, text="📷 Kamera & Patrol")
-        self.build_cam_tab(tab_cam)
-
-        # Tab 2: Server & Tujuan Siaran (YouTube / Private RTMP / Local NAS)
-        tab_server = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_server, text="🎯 Server & Siaran")
-        self.build_server_tab(tab_server)
-
-        # Tab 3: Kinerja & Hardware X230
-        tab_perf = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_perf, text="⚡ Kinerja Hardware")
-        self.build_perf_tab(tab_perf)
-
-        # Tab 4: Teks OSD & Layar
-        tab_osd = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_osd, text="✍️ OSD & Teks")
-        self.build_osd_tab(tab_osd)
-
-        # Tab 5: Notifikasi Telegram
-        tab_tg = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_tg, text="✈ Telegram")
-        self.build_tg_tab(tab_tg)
-
-        # Tab 6: Lisensi
-        tab_lic = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_lic, text="💎 Lisensi")
-        self.build_license_tab(tab_lic)
-
-        if getattr(self, "initial_tab", None) in ["license", "lic", 5]:
-            notebook.select(tab_lic)
-
-        # 3. Bottom Action Bar
-        bottom_bar = tk.Frame(self, bg="#0b0f19", padx=16, pady=10)
-        bottom_bar.pack(fill="x")
+        # 2. Bottom Action Bar (DOCK KE BAWAH LEBIH DULU AGAR SELALU TERLIHAT)
+        bottom_bar = tk.Frame(self, bg="#0b0f19", padx=16, pady=10, highlightthickness=1, highlightbackground="#1e293b")
+        bottom_bar.pack(side="bottom", fill="x")
 
         # Tombol Backup & Restore di sebelah kiri
         btn_export = tk.Button(
@@ -255,40 +223,76 @@ class SettingsDialog(tk.Toplevel):
 
         lbl_esc_hint = tk.Label(
             bottom_bar,
-            text=f"PosRonda v{__version__}",
+            text=f"PosRonda v{__version__} • Ctrl+S Simpan",
             bg="#0b0f19", fg="#64748b", font=("Segoe UI", 8)
         )
         lbl_esc_hint.pack(side="left")
-
-        btn_save = tk.Button(
-            bottom_bar, 
-            text="💾 Simpan & Terapkan Pengaturan", 
-            bg="#059669", 
-            fg="#ffffff", 
-            activebackground="#10b981",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", 
-            padx=16, pady=6,
-            cursor="hand2",
-            command=self.save_all
-        )
-        btn_save.pack(side="right", padx=5)
 
         btn_cancel = tk.Button(
             bottom_bar, 
             text="Batal", 
             bg="#334155", 
             fg="#e2e8f0", 
-            activebackground="#475569",
-            activeforeground="#ffffff",
-            font=("Segoe UI", 9),
+            activebackground="#475569", 
+            activeforeground="#ffffff", 
+            font=("Segoe UI", 9), 
             relief="flat", 
-            padx=12, pady=6,
-            cursor="hand2",
+            padx=14, pady=6, 
+            cursor="hand2", 
             command=self.destroy
         )
         btn_cancel.pack(side="right", padx=5)
+
+        btn_save = tk.Button(
+            bottom_bar, 
+            text="💾 Simpan & Terapkan Pengaturan", 
+            bg="#059669", 
+            fg="#ffffff", 
+            activebackground="#10b981", 
+            activeforeground="#ffffff", 
+            font=("Segoe UI", 9, "bold"), 
+            relief="flat", 
+            padx=18, pady=6, 
+            cursor="hand2", 
+            command=self.save_all
+        )
+        btn_save.pack(side="right", padx=5)
+
+        notebook = ttk.Notebook(self)
+        notebook.pack(side="top", fill="both", expand=True, padx=14, pady=(6, 4))
+
+        # Tab 1: Kamera CCTV (Auto-Scan & Patrol)
+        tab_cam = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
+        notebook.add(tab_cam, text="📷 Kamera & Patrol")
+        self.build_cam_tab(tab_cam)
+
+        # Tab 2: Server & Tujuan Siaran (YouTube / Private RTMP / Local NAS)
+        tab_server = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
+        notebook.add(tab_server, text="🎯 Server & Siaran")
+        self.build_server_tab(tab_server)
+
+        # Tab 3: Kinerja & Hardware X230
+        tab_perf = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
+        notebook.add(tab_perf, text="⚡ Kinerja Hardware")
+        self.build_perf_tab(tab_perf)
+
+        # Tab 4: Teks OSD & Layar
+        tab_osd = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
+        notebook.add(tab_osd, text="✍️ OSD & Teks")
+        self.build_osd_tab(tab_osd)
+
+        # Tab 5: Notifikasi Telegram
+        tab_tg = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
+        notebook.add(tab_tg, text="✈ Telegram")
+        self.build_tg_tab(tab_tg)
+
+        # Tab 6: Lisensi
+        tab_lic = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
+        notebook.add(tab_lic, text="💎 Lisensi")
+        self.build_license_tab(tab_lic)
+
+        if getattr(self, "initial_tab", None) in ["license", "lic", 5]:
+            notebook.select(tab_lic)
 
     def build_cam_tab(self, parent):
         canvas = tk.Canvas(parent, bg="#0f172a", highlightthickness=0)
@@ -1686,6 +1690,19 @@ class SettingsDialog(tk.Toplevel):
                 print(f"[Settings] Error set autostart: {e}")
 
         return self.cfg
+
+    def on_close_dialog(self):
+        """Menangani penutupan dialog via tombol X pada jendela"""
+        res = messagebox.askyesnocancel(
+            "Simpan Pengaturan?",
+            "Apakah Anda ingin menyimpan perubahan sebelum menutup jendela pengaturan?",
+            parent=self
+        )
+        if res is True:
+            self.save_all()
+        elif res is False:
+            self.destroy()
+        # Jika None (Cancel), jendela tetap terbuka
 
     def save_all(self):
         self.collect_form_data()

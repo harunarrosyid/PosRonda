@@ -2,7 +2,7 @@
 ; Mendukung Pemasangan Dwibahasa (Bahasa Indonesia & English)
 
 #ifndef MyAppVersion
-#define MyAppVersion "4.3.0"
+#define MyAppVersion "4.3.1"
 #endif
 
 [Setup]
