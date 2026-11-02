@@ -64,8 +64,13 @@ class CCTVApp:
         self.root.geometry("1280x720")
         self.root.configure(bg="#07090e")
 
-        # Muat konfigurasi
+        # Muat konfigurasi & inisialisasi bahasa
         self.cfg = config_manager.load_config()
+        try:
+            from posronda.core import i18n
+            i18n.set_language(self.cfg.get("language", "id"))
+        except Exception:
+            pass
 
         # Status kontrol streaming
         self.streaming_enabled = True

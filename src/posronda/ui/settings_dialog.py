@@ -68,6 +68,22 @@ except ImportError:
             messagebox.showerror(title, f"{message}\n\nDetail:\n{error_details or ''}", parent=parent)
 
 try:
+    from posronda.ui.playlist_dialog import CreatePlaylistDialog
+except ImportError:
+    try:
+        from playlist_dialog import CreatePlaylistDialog
+    except ImportError:
+        CreatePlaylistDialog = None
+
+try:
+    from posronda.core import i18n
+except ImportError:
+    try:
+        import i18n
+    except ImportError:
+        i18n = None
+
+try:
     from posronda import __version__
 except Exception:
     __version__ = "4.1.0"
@@ -124,6 +140,16 @@ class SettingsDialog(tk.Toplevel):
             font=("Segoe UI", 9)
         )
         lbl_sub.pack(side="left")
+
+        # Pemilih Bahasa Dwibahasa (ID / EN)
+        f_lang = tk.Frame(header, bg="#0f172a")
+        f_lang.pack(side="right")
+        tk.Label(f_lang, text="🌐 Bahasa / Lang:", bg="#0f172a", fg="#94a3b8", font=("Segoe UI", 8)).pack(side="left", padx=(0, 4))
+        self.cmb_lang = ttk.Combobox(f_lang, values=["🇮🇩 Bahasa Indonesia", "🇬🇧 English"], state="readonly", width=19)
+        cur_lang = self.cfg.get("language", "id")
+        self.cmb_lang.set("🇮🇩 Bahasa Indonesia" if cur_lang == "id" else "🇬🇧 English")
+        self.cmb_lang.pack(side="left")
+        self.cmb_lang.bind("<<ComboboxSelected>>", self.on_language_changed)
 
         # License Pill on Header
         lic_info = LicenseManager.get_license_info()
@@ -850,10 +876,42 @@ class SettingsDialog(tk.Toplevel):
         btn_br = tk.Button(f_sec, text="Pilih...", bg="#334155", fg="#cbd5e1", relief="flat", font=("Segoe UI", 7), command=self.browse_secret)
         btn_br.pack(side="left")
 
+        # Pemilih Playlist dari Channel YouTube (Anti-Ribet)
+        f_pl_sel = tk.Frame(f_api_box, bg="#0f172a")
+        f_pl_sel.pack(fill="x", pady=2)
+        tk.Label(f_pl_sel, text="Pilih Playlist:", bg="#0f172a", fg="#cbd5e1", font=("Segoe UI", 8), width=18, anchor="w").pack(side="left")
+        
+        self.channel_playlists = []
+        self.cmb_playlist = ttk.Combobox(f_pl_sel, state="readonly", width=30)
+        self.cmb_playlist.set("-- Klik 'Muat' untuk daftar playlist --")
+        self.cmb_playlist.pack(side="left", padx=4)
+        self.cmb_playlist.bind("<<ComboboxSelected>>", self.on_playlist_selected)
+
+        btn_fetch_pl = tk.Button(
+            f_pl_sel, text="🔄 Muat",
+            bg="#334155", fg="#38bdf8",
+            activebackground="#475569", activeforeground="#ffffff",
+            relief="flat", font=("Segoe UI", 7, "bold"),
+            padx=5, pady=1, cursor="hand2",
+            command=self.fetch_channel_playlists
+        )
+        btn_fetch_pl.pack(side="left", padx=(0, 4))
+
+        btn_new_pl = tk.Button(
+            f_pl_sel, text="➕ Buat Baru",
+            bg="#0284c7", fg="#ffffff",
+            activebackground="#0369a1", activeforeground="#ffffff",
+            relief="flat", font=("Segoe UI", 7, "bold"),
+            padx=5, pady=1, cursor="hand2",
+            command=self.open_create_playlist_dialog
+        )
+        btn_new_pl.pack(side="left")
+
+        # Baris ID Playlist Aktif (Bisa diedit manual jika diinginkan)
         f_pl = tk.Frame(f_api_box, bg="#0f172a")
         f_pl.pack(fill="x", pady=2)
-        tk.Label(f_pl, text="Playlist ID:", bg="#0f172a", fg="#cbd5e1", font=("Segoe UI", 8), width=18, anchor="w").pack(side="left")
-        self.ent_playlist = tk.Entry(f_pl, font=("Segoe UI", 8), width=38, bg="#1e293b", fg="#ffffff", insertbackground="#38bdf8")
+        tk.Label(f_pl, text="Playlist ID Aktif:", bg="#0f172a", fg="#94a3b8", font=("Segoe UI", 8), width=18, anchor="w").pack(side="left")
+        self.ent_playlist = tk.Entry(f_pl, font=("Consolas", 8), width=38, bg="#1e293b", fg="#38bdf8", insertbackground="#38bdf8")
         self.ent_playlist.insert(0, yt_cfg.get("playlist_id", ""))
         self.ent_playlist.pack(side="left", padx=4)
 
@@ -908,6 +966,126 @@ class SettingsDialog(tk.Toplevel):
         if f:
             self.ent_secret.delete(0, tk.END)
             self.ent_secret.insert(0, f)
+            # Otomatis coba muat daftar playlist saat file secret dipilih
+            self.fetch_channel_playlists(silent=True)
+
+    def on_language_changed(self, event=None):
+        val = self.cmb_lang.get()
+        new_lang = "en" if "English" in val else "id"
+        self.cfg["language"] = new_lang
+        if i18n:
+            i18n.set_language(new_lang)
+        hint = (
+            "Bahasa antarmuka diubah ke English.\nKlik 'Simpan' untuk menyimpan preferensi."
+            if new_lang == "en"
+            else "Bahasa antarmuka diubah ke Bahasa Indonesia.\nKlik 'Simpan' untuk menyimpan preferensi."
+        )
+        messagebox.showinfo("Bahasa / Language", hint, parent=self)
+
+    def on_playlist_selected(self, event=None):
+        sel_idx = self.cmb_playlist.current()
+        if hasattr(self, 'channel_playlists') and 0 <= sel_idx < len(self.channel_playlists):
+            pl = self.channel_playlists[sel_idx]
+            pl_id = pl.get("id", "")
+            self.ent_playlist.delete(0, tk.END)
+            self.ent_playlist.insert(0, pl_id)
+
+    def fetch_channel_playlists(self, silent=False):
+        secret_file = self.ent_secret.get().strip()
+        if not secret_file or not os.path.exists(secret_file):
+            if not silent:
+                messagebox.showerror(
+                    "File Secret Tidak Ditemukan",
+                    f"File '{secret_file}' tidak ditemukan!\nPilih file client_secrets.json terlebih dahulu.",
+                    parent=self
+                )
+            return
+
+        def run_fetch():
+            try:
+                try:
+                    from posronda.network.youtube_manager import YouTubeManager
+                except ImportError:
+                    from youtube_manager import YouTubeManager
+
+                temp_cfg = dict(self.cfg)
+                temp_cfg.setdefault("youtube_api", {})["client_secrets_file"] = secret_file
+                yt = YouTubeManager(temp_cfg)
+                ok, playlists, err = yt.list_channel_playlists()
+                if ok:
+                    def _update_ui():
+                        self.channel_playlists = playlists
+                        current_id = self.ent_playlist.get().strip()
+                        pl_labels = []
+                        match_idx = -1
+                        for idx, p in enumerate(playlists):
+                            label = f"{p['title']} ({p['privacy'].title()}) [ID: {p['id']}]"
+                            pl_labels.append(label)
+                            if current_id and p['id'] == current_id:
+                                match_idx = idx
+
+                        self.cmb_playlist['values'] = pl_labels
+                        if match_idx >= 0:
+                            self.cmb_playlist.current(match_idx)
+                        elif pl_labels:
+                            self.cmb_playlist.set("-- Pilih Playlist dari Channel --")
+                        else:
+                            self.cmb_playlist.set("(Channel belum memiliki playlist)")
+
+                        if not silent:
+                            messagebox.showinfo(
+                                "Daftar Playlist Dimuat",
+                                f"✔ Berhasil memuat {len(playlists)} playlist dari channel YouTube Anda!\n"
+                                f"Silakan pilih playlist yang diinginkan pada dropdown.",
+                                parent=self
+                            )
+                    self.after(0, _update_ui)
+                else:
+                    if not silent:
+                        self.after(0, lambda: show_error_dialog(
+                            self,
+                            "Gagal Memuat Playlist",
+                            "Tidak dapat mengambil daftar playlist dari YouTube Studio.",
+                            error_details=err,
+                            action_url="https://studio.youtube.com",
+                            action_url_label="🌐 Buka YouTube Studio"
+                        ))
+            except Exception as e:
+                if not silent:
+                    import traceback
+                    err_trace = traceback.format_exc()
+                    self.after(0, lambda: show_error_dialog(
+                        self,
+                        "Error Memuat Playlist",
+                        f"Gagal memuat playlist:\n{e}",
+                        error_details=err_trace
+                    ))
+
+        import threading
+        threading.Thread(target=run_fetch, daemon=True).start()
+
+    def open_create_playlist_dialog(self):
+        secret_file = self.ent_secret.get().strip()
+        if not secret_file or not os.path.exists(secret_file):
+            messagebox.showerror(
+                "File Secret Tidak Ditemukan",
+                f"File '{secret_file}' tidak ditemukan!\nPilih file client_secrets.json terlebih dahulu.",
+                parent=self
+            )
+            return
+
+        temp_cfg = dict(self.cfg)
+        temp_cfg.setdefault("youtube_api", {})["client_secrets_file"] = secret_file
+
+        def _on_created(new_pl):
+            self.ent_playlist.delete(0, tk.END)
+            self.ent_playlist.insert(0, new_pl["id"])
+            self.fetch_channel_playlists(silent=True)
+
+        if CreatePlaylistDialog:
+            CreatePlaylistDialog(self, temp_cfg, _on_created)
+        else:
+            messagebox.showerror("Error", "Modul CreatePlaylistDialog tidak tersedia.", parent=self)
 
     def test_youtube_api(self):
         secret_file = self.ent_secret.get().strip()
@@ -946,6 +1124,8 @@ class SettingsDialog(tk.Toplevel):
                             self.ent_stream_key.delete(0, tk.END)
                             self.ent_stream_key.insert(0, detected_key)
                         messagebox.showinfo("Koneksi YouTube API Sukses", message, parent=self)
+                        # Otomatis muat daftar playlist setelah API sukses terhubung
+                        self.fetch_channel_playlists(silent=True)
                     self.after(0, _on_success)
                 else:
                     self.after(0, lambda: messagebox.showwarning("Peringatan YouTube API", message, parent=self))
@@ -1459,6 +1639,10 @@ class SettingsDialog(tk.Toplevel):
         self.cfg["youtube_api"]["title_prefix"] = self.ent_title.get().strip()
         lat_choice = self.cmb_latency.get()
         self.cfg["youtube_api"]["latency_preference"] = "ultraLow" if "ultraLow" in lat_choice else "normal" if "normal" in lat_choice else "low"
+
+        # Simpan Preferensi Bahasa
+        if hasattr(self, "cmb_lang"):
+            self.cfg["language"] = "en" if "English" in self.cmb_lang.get() else "id"
 
         # Hardware & Perf
         res_choice = self.cmb_res.get()

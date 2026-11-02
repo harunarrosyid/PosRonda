@@ -123,6 +123,79 @@ class YouTubeManager:
 
         return True, msg, stream_key
 
+    def list_channel_playlists(self):
+        """
+        Mengambil daftar seluruh playlist yang dimiliki oleh channel YouTube pengguna.
+        Mengembalikan tuple: (success: bool, playlists: list, error_log: str/None)
+        """
+        if not self.service:
+            self.authenticate()
+
+        playlists = []
+        try:
+            next_page = None
+            while True:
+                req_args = {
+                    "part": "id,snippet,status,contentDetails",
+                    "mine": True,
+                    "maxResults": 50
+                }
+                if next_page:
+                    req_args["pageToken"] = next_page
+
+                resp = self.service.playlists().list(**req_args).execute()
+                for item in resp.get("items", []):
+                    playlists.append({
+                        "id": item["id"],
+                        "title": item.get("snippet", {}).get("title", "Untitled Playlist"),
+                        "description": item.get("snippet", {}).get("description", ""),
+                        "privacy": item.get("status", {}).get("privacyStatus", "unlisted"),
+                        "item_count": item.get("contentDetails", {}).get("itemCount", 0)
+                    })
+                next_page = resp.get("nextPageToken")
+                if not next_page:
+                    break
+
+            return True, playlists, None
+        except Exception as e:
+            import traceback
+            return False, [], traceback.format_exc()
+
+    def create_playlist(self, title, description="", privacy_status="unlisted"):
+        """
+        Membuat playlist baru langsung di channel YouTube pengguna.
+        privacy_status: 'unlisted' | 'public' | 'private'
+        Mengembalikan tuple: (success: bool, created_playlist_dict: dict/None, error_log: str/None)
+        """
+        if not self.service:
+            self.authenticate()
+
+        try:
+            body = {
+                "snippet": {
+                    "title": title.strip(),
+                    "description": description.strip() or "Arsip Rekaman CCTV Otomatis - PosRonda Surveillance Hub"
+                },
+                "status": {
+                    "privacyStatus": privacy_status.lower()
+                }
+            }
+            resp = self.service.playlists().insert(
+                part="snippet,status",
+                body=body
+            ).execute()
+
+            new_pl = {
+                "id": resp["id"],
+                "title": resp.get("snippet", {}).get("title", title),
+                "privacy": resp.get("status", {}).get("privacyStatus", privacy_status),
+                "item_count": 0
+            }
+            return True, new_pl, None
+        except Exception as e:
+            import traceback
+            return False, None, traceback.format_exc()
+
     def find_existing_upcoming_broadcast(self):
         """Mencari apakah sudah ada siaran 'upcoming' aktif milik CCTV Hub untuk digunakan kembali (Anti-Numpuk)"""
         if not self.service:
