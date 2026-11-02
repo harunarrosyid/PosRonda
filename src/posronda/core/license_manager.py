@@ -1,16 +1,6 @@
 """
 PosRonda License Manager
-Sistem Lisensi Terbuka Semi Open-Source (Model WinRAR)
-
-Fitur:
-1. PosRonda Community Edition:
-   - 100% Gratis selamanya untuk penggunaan non-komersial, warga RT/RW, pos ronda, tempat ibadah, dan edukasi.
-   - Tanpa batasan waktu, tanpa batasan durasi siaran, tanpa pengurangan fitur teknis CCTV.
-2. PosRonda PRO Edition (Commercial / Technician License):
-   - Ditujukan untuk teknisi CCTV profesional, installer komersial, ruko, perkantoran, dan pabrik.
-   - Fitur White-Label: Memungkinkan penggantian logo & nama PosRonda dengan merek dagang teknisi/installer sendiri.
-   - Watermark kustom & banner perusahaan pada streaming YouTube.
-   - Kunci konfigurasi teknisi (Installer PIN Lock).
+Pengelolaan status lisensi PosRonda Community dan Pro.
 """
 
 import os
@@ -50,7 +40,7 @@ class LicenseManager:
                 "org": "Penggunaan Mandiri (Non-Komersial)",
                 "watermark_brand": "PosRonda Hub v4.0",
                 "white_label_enabled": False,
-                "status_text": "Aktif Selamanya (Gratis ala WinRAR)"
+                "status_text": "Aktif (Non-Komersial)"
             }
 
         try:
@@ -95,7 +85,7 @@ class LicenseManager:
                 "org": "Non-Komersial",
                 "watermark_brand": "PosRonda Hub v4.0",
                 "white_label_enabled": False,
-                "status_text": "Aktif Selamanya (Gratis ala WinRAR)"
+                "status_text": "Aktif (Non-Komersial)"
             }
 
     @staticmethod

@@ -12,7 +12,7 @@ Mendukung:
 5. Hardware Engine X230 (Intel QuickSync GPU QSV & x264)
 6. Teks OSD & Watermark
 7. Notifikasi Telegram Bot
-8. Lisensi Semi Open-Source Model WinRAR (Community & PRO Edition)
+8. Lisensi Aplikasi (Community & PRO Edition)
 """
 
 import tkinter as tk
@@ -135,9 +135,9 @@ class SettingsDialog(tk.Toplevel):
         notebook.add(tab_tg, text="✈ Telegram")
         self.build_tg_tab(tab_tg)
 
-        # Tab 6: Lisensi & Model WinRAR
+        # Tab 6: Lisensi
         tab_lic = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_lic, text="💎 Lisensi (WinRAR)")
+        notebook.add(tab_lic, text="💎 Lisensi")
         self.build_license_tab(tab_lic)
 
         # 3. Bottom Action Bar
@@ -1072,22 +1072,21 @@ class SettingsDialog(tk.Toplevel):
         )
         lbl_status_desc.pack(anchor="w", pady=(4, 0))
 
-        c_winrar = tk.Frame(parent, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
-        c_winrar.pack(fill="x", pady=(0, 12))
+        c_info = tk.Frame(parent, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
+        c_info.pack(fill="x", pady=(0, 12))
 
-        tk.Label(c_winrar, text="📖 Konsep Lisensi PosRonda (Semi Open-Source ala WinRAR)", bg="#1e293b", fg="#34d399", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(c_info, text="Informasi Edisi PosRonda", bg="#1e293b", fg="#34d399", font=("Segoe UI", 10, "bold")).pack(anchor="w")
         tk.Label(
-            c_winrar,
-            text="PosRonda menganut filosofi keterbukaan ala WinRAR:\n"
-                 "• PosRonda Community Edition: Sepenuhnya GRATIS selamanya tanpa batasan durasi monitoring,\n"
-                 "  tanpa batas waktu, dan tidak pernah kedaluwarsa untuk warga RT/RW, masjid, dan pos kamling.\n"
-                 "• PosRonda PRO Commercial Edition: Ditujukan bagi teknisi / installer CCTV profesional yang menjual\n"
-                 "  solusi monitoring siap pakai kepada klien komersial (ruko, perkantoran, perumahan elitis, pabrik).",
+            c_info,
+            text="Skema Penggunaan PosRonda:\n"
+                 "• PosRonda Community Edition: Gratis untuk penggunaan pribadi, lingkungan warga, dan fasilitas umum.\n"
+                 "• PosRonda PRO Edition: Ditujukan untuk instalasi komersial dengan fitur kustomisasi merek (white-labeling),\n"
+                 "  watermark kustom, serta proteksi pengaturan teknisi.",
             bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 8), justify="left"
         ).pack(anchor="w", pady=(4, 6))
 
         tk.Label(
-            c_winrar,
+            c_info,
             text="Fitur Eksklusif PosRonda PRO:\n"
                  "✔ Multi-Kamera hingga 16 Kamera (Grid 3x3 & Auto Patrol Tour).\n"
                  "✔ Private Media Server (MediaMTX / SRS) & Direct Local NAS Recording.\n"

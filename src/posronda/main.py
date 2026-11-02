@@ -1,8 +1,6 @@
 """
-PosRonda v4.0 - Autonomous CCTV Multi-Camera Hub & Live Streaming Engine
-Monitoring Multi-Kamera (2x2 Patrol / 3x3 Grid) + Auto Streaming (YouTube Live, Private RTMP, HDD/NAS).
-Dioptimalkan untuk ThinkPad X230 (Intel QuickSync QSV).
-Semi Open-Source License Model (ala WinRAR).
+PosRonda v4.0 - Aplikasi Pemantau CCTV Multi-Kamera & Live Streaming Engine
+Monitoring Multi-Kamera (2x2 Patrol / 3x3 Grid) + Streaming (YouTube Live, Private RTMP, HDD/NAS).
 """
 
 import sys
@@ -133,7 +131,7 @@ class CCTVApp:
         )
         self.lbl_status_text.pack(side="left", fill="x", expand=True)
 
-        # Kanan: Tombol Kendali Cepat (Fullscreen, About/WinRAR, Settings, Navigasi Halaman, Akhiri, Restart, Jeda)
+        # Kanan: Tombol Kendali Cepat (Fullscreen, Lisensi, Settings, Navigasi Halaman, Akhiri, Restart, Jeda)
         self.btn_fs = tk.Button(
             self.bottom_bar, 
             text="⛶ Fullscreen (F11)", 
@@ -279,7 +277,7 @@ class CCTVApp:
         self.lifecycle_thread = threading.Thread(target=self._youtube_lifecycle_loop, daemon=True)
         self.lifecycle_thread.start()
 
-        # Mulai Render Loop GUI (OBS Zero-Overhead In-Place Paste @ ~33 FPS, hemat CPU/GIL 95%)
+        # Mulai Render Loop GUI
         self.render_interval_ms = 30
         self.root.after(100, self.update_frame_loop)
 
@@ -854,7 +852,6 @@ class CCTVApp:
 
     def update_frame_loop(self):
         try:
-            # OBS Zero-Overhead Rendering: In-place PhotoImage.paste (Sub-millisecond Win32 DIB Update)
             gui_rgb = self.compositor.get_latest_gui_frame()
             if gui_rgb is not None:
                 gh, gw, _ = gui_rgb.shape
@@ -1008,8 +1005,8 @@ class CCTVApp:
     def open_about_dialog(self):
         lic = LicenseManager.get_license_info()
         dlg = tk.Toplevel(self.root)
-        dlg.title("Tentang PosRonda - Semi Open-Source (Model WinRAR)")
-        dlg.geometry("540x440")
+        dlg.title("Tentang PosRonda")
+        dlg.geometry("520x400")
         dlg.resizable(False, False)
         dlg.configure(bg="#0b0f19")
         dlg.transient(self.root)
@@ -1018,25 +1015,22 @@ class CCTVApp:
         f_card = tk.Frame(dlg, bg="#1e293b", padx=20, pady=18, highlightthickness=1, highlightbackground="#334155")
         f_card.pack(fill="both", expand=True, padx=16, pady=16)
 
-        tk.Label(f_card, text="🛡️ PosRonda Hub v4.0", bg="#1e293b", fg="#818cf8", font=("Segoe UI", 13, "bold")).pack(anchor="w")
-        tk.Label(f_card, text="Autonomous CCTV Multi-Camera Hub & Live Streaming Engine", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 8)).pack(anchor="w", pady=(2, 10))
+        tk.Label(f_card, text="PosRonda v4.0", bg="#1e293b", fg="#818cf8", font=("Segoe UI", 13, "bold")).pack(anchor="w")
+        tk.Label(f_card, text="Aplikasi Pemantau CCTV Multi-Kamera & Live Streaming", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 10))
 
         # Status Lisensi Box
         f_st = tk.Frame(f_card, bg="#0f172a", padx=12, pady=8)
         f_st.pack(fill="x", pady=4)
-        tk.Label(f_st, text=f"💎 Edisi: {lic.get('tier_name')}", bg="#0f172a", fg="#38bdf8", font=("Segoe UI", 9, "bold")).pack(anchor="w")
+        tk.Label(f_st, text=f"Edisi: {lic.get('tier_name')}", bg="#0f172a", fg="#38bdf8", font=("Segoe UI", 9, "bold")).pack(anchor="w")
         tk.Label(f_st, text=f"Status: {lic.get('status_text')}", bg="#0f172a", fg="#cbd5e1", font=("Segoe UI", 8)).pack(anchor="w")
         tk.Label(f_st, text=f"Pemegang: {lic.get('holder')} ({lic.get('org')})", bg="#0f172a", fg="#94a3b8", font=("Segoe UI", 8)).pack(anchor="w")
 
-        # Filosofi ala WinRAR
         tk.Label(
             f_card,
-            text="Filosofi Lisensi Semi Open-Source (Model WinRAR):\n"
-                 "• PosRonda Community Edition dapat digunakan secara GRATIS selamanya tanpa batasan fitur monitoring "
-                 "dan tanpa pernah kedaluwarsa oleh warga, RT/RW, masjid, dan pos siskamling.\n\n"
-                 "• Untuk teknisi CCTV & installer komersial, silakan gunakan PosRonda PRO untuk mendapatkan fitur White-Labeling, "
-                 "Watermark logo perusahaan Anda sendiri, dan Kunci PIN installer.",
-            bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 8), justify="left", wraplength=470
+            text="Informasi Lisensi:\n"
+                 "• Community Edition: Bebas digunakan untuk kebutuhan non-komersial, lingkungan warga, dan fasilitas umum.\n\n"
+                 "• PRO Edition: Ditujukan untuk instalasi komersial dengan fitur white-labeling, custom watermark, dan kunci PIN pengaturan.",
+            bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 8), justify="left", wraplength=460
         ).pack(anchor="w", pady=(10, 14))
 
         # Tombol Aksi
@@ -1049,7 +1043,7 @@ class CCTVApp:
         ).pack(side="right", padx=(4, 0))
 
         tk.Button(
-            f_btns, text="⚙️ Pengaturan & Lisensi", bg="#0284c7", fg="#ffffff", relief="flat", font=("Segoe UI", 8, "bold"),
+            f_btns, text="Pengaturan & Lisensi", bg="#0284c7", fg="#ffffff", relief="flat", font=("Segoe UI", 8, "bold"),
             padx=12, pady=4, cursor="hand2", command=lambda: [dlg.destroy(), self.open_settings()]
         ).pack(side="right")
 

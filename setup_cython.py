@@ -1,6 +1,5 @@
 """
-setup_cython.py - Kompilasi modul core PosRonda menjadi C Native Binary (.pyd / .so)
-Melindungi intellectual property, logika lisensi, dan mesin streaming dari decompiler Python (ala .aar di Android).
+setup_cython.py - Kompilasi modul inti PosRonda menjadi C Extension (.pyd / .so)
 """
 import sys
 import os

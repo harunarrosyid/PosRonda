@@ -201,7 +201,7 @@ class RTSPCameraWorker(threading.Thread):
                 # Gambar label OSD adaptif yang proporsional dan selalu terbaca
                 draw_cctv_osd(resized, self._cached_osd_text, font_scale=self.font_scale, position=self.osd_pos, style=self.osd_style)
 
-                # Assignment atomik bebas lock (OBS Lock-Free Architecture)
+                # Assignment atomik bebas lock
                 self.current_frame = resized
                 self.status = "ONLINE"
 
@@ -213,7 +213,6 @@ class RTSPCameraWorker(threading.Thread):
 
     def get_frame_direct(self, target_buf=None):
         """
-        OBS Lock-Free Architecture:
         Atomic reference read tanpa mutex lock (zero lock contention).
         Jika target_buf diberikan (slice numpy), C-memcpy langsung ke buffer tujuan!
         """
