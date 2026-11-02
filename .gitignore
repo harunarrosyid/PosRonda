@@ -3,16 +3,21 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Compiled C / Cython extensions
+*.pyd
+*.so
+*.c
+
 # PyInstaller build outputs
 build/
 dist/
 *.spec.bak
+*.exe
 
-# Large binary installers & executables (tidak boleh di-push ke GitHub karena >100MB)
-ffmpeg.exe
-ffprobe.exe
+# Large binary installers & archives
 python-3.11.9-amd64.exe
 update_*.zip
+PosRonda*.zip
 
 # Local dynamic runtime logs & recordings
 ffmpeg_log.txt

@@ -1,10 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+import sys
+import os
 from PyInstaller.utils.hooks import collect_all
+
+base_dir = os.path.dirname(os.path.abspath(SPEC))
+src_dir = os.path.join(base_dir, "src")
 
 datas = [('config.json', '.')]
 binaries = []
 hiddenimports = [
+    'posronda',
+    'posronda.main',
+    'posronda.core',
+    'posronda.core.config_manager',
+    'posronda.core.license_manager',
+    'posronda.core.stream_engine',
+    'posronda.ui',
+    'posronda.ui.settings_dialog',
+    'posronda.network',
+    'posronda.network.onvif_scanner',
+    'posronda.network.youtube_manager',
+    'posronda.network.notifier',
+    'posronda.utils',
+    'posronda.utils.check_env',
     'googleapiclient',
     'googleapiclient.discovery',
     'google_auth_oauthlib',
@@ -29,15 +47,15 @@ for pkg in ['googleapiclient', 'google_auth_oauthlib', 'cv2', 'PIL']:
         pass
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['run.py'],
+    pathex=[src_dir, base_dir],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['matplotlib', 'scipy', 'pandas'],
+    excludes=['matplotlib', 'scipy', 'pandas', 'IPython', 'notebook'],
     noarchive=False,
 )
 

@@ -6,7 +6,16 @@ Alat pengujian cepat untuk YouTube API, Playlist, 4 RTSP Kamera, dan Telegram.
 import os
 import sys
 import time
-import config_manager
+
+# Tambahkan src ke sys.path
+_src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+
+try:
+    from posronda.core import config_manager
+except ImportError:
+    import config_manager
 import cv2
 
 def print_header(title):

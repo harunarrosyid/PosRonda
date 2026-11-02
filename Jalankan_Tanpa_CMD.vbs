@@ -11,4 +11,4 @@ ElseIf fso.FileExists(WshShell.ExpandEnvironmentStrings("%ProgramFiles%\Python31
     PythonW = """" & WshShell.ExpandEnvironmentStrings("%ProgramFiles%\Python311\pythonw.exe") & """"
 End If
 
-WshShell.Run PythonW & " main.py", 0, False
+WshShell.Run PythonW & " run.py", 0, False

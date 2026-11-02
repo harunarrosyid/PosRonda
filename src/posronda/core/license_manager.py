@@ -22,7 +22,14 @@ import time
 def get_base_dir():
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, "config.json")):
+        return cwd
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    root_candidate = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
+    if os.path.exists(os.path.join(root_candidate, "config.json")):
+        return root_candidate
+    return cwd
 
 LICENSE_FILE = os.path.join(get_base_dir(), "posronda.lic")
 LICENSE_SECRET_SALT = "POSRONDA_SECURE_SALT_v4_2026_CORE"

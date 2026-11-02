@@ -23,9 +23,14 @@ import threading
 import time
 import re
 
-import onvif_scanner
-import config_manager
-from license_manager import LicenseManager
+try:
+    from posronda.network import onvif_scanner
+    from posronda.core import config_manager
+    from posronda.core.license_manager import LicenseManager
+except ImportError:
+    import onvif_scanner
+    import config_manager
+    from license_manager import LicenseManager
 
 class SettingsDialog(tk.Toplevel):
     def __init__(self, parent, config, on_save_callback):

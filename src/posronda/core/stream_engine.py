@@ -26,6 +26,18 @@ import subprocess
 import cv2
 import numpy as np
 
+def _get_base_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, "config.json")):
+        return cwd
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    root_candidate = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
+    if os.path.exists(os.path.join(root_candidate, "config.json")):
+        return root_candidate
+    return cwd
+
 def draw_patrol_badge(img, text):
     """Menggambar badge halaman patrol di bagian atas tengah kanvas"""
     h, w = img.shape[:2]
@@ -420,7 +432,7 @@ class FFmpegStreamPusher:
             cmd.extend(["-pix_fmt", "yuv420p"])
 
         if self.mode == "local_recording":
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            base_dir = _get_base_dir()
             rec_dir = os.path.join(base_dir, self.local_output_dir) if not os.path.isabs(self.local_output_dir) else self.local_output_dir
             os.makedirs(rec_dir, exist_ok=True)
             file_pattern = os.path.join(rec_dir, "PosRonda_%Y-%m-%d_%H-%M-%S.mp4")
@@ -453,7 +465,7 @@ class FFmpegStreamPusher:
         return cmd
 
     def start(self):
-        base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        base_dir = _get_base_dir()
 
         if self.mode == "local_recording":
             target = os.path.join(base_dir, self.local_output_dir) if not os.path.isabs(self.local_output_dir) else self.local_output_dir

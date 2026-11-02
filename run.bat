@@ -30,7 +30,7 @@ for /f "tokens=*" %%i in ('where python 2^>nul') do (
 if "%PYTHON_EXE%"=="" set "PYTHON_EXE=python"
 
 echo Menjalankan PosRonda Hub v4.0...
-"%PYTHON_EXE%" main.py
+"%PYTHON_EXE%" run.py
 if errorlevel 1 (
     color 0C
     echo.

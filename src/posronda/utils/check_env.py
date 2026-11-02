@@ -34,11 +34,15 @@ def check_ffmpeg():
         return True, "FFmpeg terdeteksi di System PATH"
     
     # 2. Cek di folder lokal aplikasi
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    root_candidate = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
     local_paths = [
-        os.path.join(os.path.dirname(__file__), "ffmpeg.exe"),
-        os.path.join(os.path.dirname(__file__), "ffmpeg", "bin", "ffmpeg.exe"),
         os.path.join(os.getcwd(), "ffmpeg.exe"),
         os.path.join(os.getcwd(), "ffmpeg", "bin", "ffmpeg.exe"),
+        os.path.join(root_candidate, "ffmpeg.exe"),
+        os.path.join(root_candidate, "ffmpeg", "bin", "ffmpeg.exe"),
+        os.path.join(os.path.dirname(sys.executable), "ffmpeg.exe"),
+        os.path.join(this_dir, "ffmpeg.exe"),
     ]
     for p in local_paths:
         if os.path.exists(p):

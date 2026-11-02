@@ -1,4 +1,4 @@
-name: Build PosRonda Windows EXE
+name: Build PosRonda Windows EXE (Cython C-Binary Core)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-windows:
-    name: Compile PosRonda.exe (Windows 64-bit)
+    name: Compile PosRonda.exe (Cython .pyd + PyInstaller)
     runs-on: windows-latest
 
     steps:
@@ -20,33 +20,39 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
 
-    - name: 3. Install Dependencies & PyInstaller
+    - name: 3. Install Dependencies & Build Tools
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: 4. Build Windows EXE with PyInstaller
+    - name: 4. Compile Core Proprietary Engine with Cython (.pyd Native C Binary)
+      run: |
+        python setup_cython.py build_ext --inplace
+        echo "=== Hasil Kompilasi Cython (.pyd) ==="
+        dir src\posronda\core\*.pyd
+
+    - name: 5. Build Windows Native EXE with PyInstaller
       run: |
         pyinstaller PosRonda.spec --clean --noconfirm
 
-    - name: 5. Verify Build Output
+    - name: 6. Verify Executable Output
       shell: bash
       run: |
         if [ -f "dist/PosRonda.exe" ]; then
-          echo "✔ File PosRonda.exe berhasil dibuat! Ukuran:"
+          echo "✔ File PosRonda.exe (Cython-Protected) berhasil dibuat!"
           ls -lh dist/PosRonda.exe
         else
           echo "❌ dist/PosRonda.exe tidak ditemukan!"
           exit 1
         fi
 
-    - name: 6. Upload EXE Artifact
+    - name: 7. Upload Encrypted EXE Artifact
       uses: actions/upload-artifact@v4
       with:
         name: PosRonda-Windows-v4.0
         path: |
           dist/PosRonda.exe
           config.json
-          PANDUAN.md
+          docs/PANDUAN.md
         retention-days: 30

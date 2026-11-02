@@ -31,12 +31,20 @@ from PIL import Image, ImageTk
 import cv2
 import numpy as np
 
-import check_env
-import config_manager
-from license_manager import LicenseManager
-from stream_engine import RTSPCameraWorker, FFmpegStreamPusher, GridCompositor
-from settings_dialog import SettingsDialog
-from notifier import TelegramNotifier
+try:
+    from posronda.core import config_manager
+    from posronda.core.license_manager import LicenseManager
+    from posronda.core.stream_engine import RTSPCameraWorker, FFmpegStreamPusher, GridCompositor
+    from posronda.ui.settings_dialog import SettingsDialog
+    from posronda.network.notifier import TelegramNotifier
+    from posronda.utils import check_env
+except ImportError:
+    import check_env
+    import config_manager
+    from license_manager import LicenseManager
+    from stream_engine import RTSPCameraWorker, FFmpegStreamPusher, GridCompositor
+    from settings_dialog import SettingsDialog
+    from notifier import TelegramNotifier
 
 class CCTVApp:
     def __init__(self, root):
@@ -502,7 +510,10 @@ class CCTVApp:
                 # Jika YouTube API Aktif: buat / hubungkan broadcast
                 if yt_cfg.get("enabled", False) and self.streaming_enabled:
                     try:
-                        from youtube_manager import YouTubeManager
+                        try:
+                            from posronda.network.youtube_manager import YouTubeManager
+                        except ImportError:
+                            from youtube_manager import YouTubeManager
                         if not self.youtube_mgr:
                             self.youtube_mgr = YouTubeManager(self.cfg)
                             self.youtube_mgr.authenticate()

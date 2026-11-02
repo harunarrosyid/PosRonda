@@ -6,7 +6,14 @@ def get_base_dir():
     """Mendapatkan direktori dasar aplikasi (kompatibel dengan script biasa maupun PyInstaller .exe)"""
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, "config.json")):
+        return cwd
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    root_candidate = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
+    if os.path.exists(os.path.join(root_candidate, "config.json")):
+        return root_candidate
+    return cwd
 
 DEFAULT_CONFIG = {
     "app_name": "PosRonda",
