@@ -69,9 +69,29 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+# Integrasi Splash Screen instan saat pengguna klik EXE
+splash_items = []
+splash_img = os.path.join(base_dir, 'resources', 'splash.png')
+if os.path.exists(splash_img):
+    try:
+        splash = Splash(
+            splash_img,
+            binaries=a.binaries,
+            datas=a.datas,
+            text_pos=(35, 263),
+            text_size=9,
+            text_color='#38bdf8',
+            text_default='Memuat modul aplikasi PosRonda...'
+        )
+        splash_items = [splash, splash.binaries]
+        print(f"[*] Splash screen berhasil diintegrasikan dari {splash_img}")
+    except Exception as e:
+        print(f"[!] Info splash screen: {e}")
+
 exe = EXE(
     pyz,
     a.scripts,
+    *splash_items,
     a.binaries,
     a.datas,
     [],

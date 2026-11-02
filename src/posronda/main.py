@@ -1399,18 +1399,54 @@ def ensure_single_instance(port=49382):
         return False
 
 def main():
+    try:
+        import pyi_splash
+        pyi_splash.update_text("Menginisialisasi PosRonda Hub...")
+    except ImportError:
+        pass
+
     # 0. Single-instance lock: cegah multi-window jika user klik berkali-kali
     if not ensure_single_instance():
+        try:
+            import pyi_splash
+            pyi_splash.close()
+        except ImportError:
+            pass
         sys.exit(0)
 
     # 1. Pre-flight check (Deteksi Python & FFmpeg)
+    try:
+        import pyi_splash
+        pyi_splash.update_text("Memeriksa komponen FFmpeg & jaringan...")
+    except ImportError:
+        pass
+
     ready = check_env.run_check(show_gui_if_missing=True)
     if not ready:
+        try:
+            import pyi_splash
+            pyi_splash.close()
+        except ImportError:
+            pass
         sys.exit(1)
+
+    try:
+        import pyi_splash
+        pyi_splash.update_text("Menyiapkan antarmuka pemantau...")
+    except ImportError:
+        pass
 
     root = tk.Tk()
     app = CCTVApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
+
+    # Tutup splash screen begitu antarmuka utama sudah siap tampil di layar
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except ImportError:
+        pass
+
     root.mainloop()
 
 if __name__ == "__main__":

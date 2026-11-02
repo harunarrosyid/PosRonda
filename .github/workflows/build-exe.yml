@@ -102,11 +102,28 @@ jobs:
         Copy-Item docs\PANDUAN.md -Destination pkg-lite\
         Compress-Archive -Path pkg-lite\* -DestinationPath "PosRonda-v$($env:APP_VERSION)-Lite.zip" -Force
 
-    - name: 10. Upload Build Artifacts
+    - name: 10. Build Official Windows Setup Installer (Inno Setup)
+      shell: pwsh
+      run: |
+        Write-Host "===> Membangun Installer Resmi Windows (PosRonda-Setup.exe)..."
+        $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $isccPath)) {
+          Write-Host "Inno Setup belum terpasang, menginstal via Chocolatey..."
+          choco install innosetup --no-progress -y
+        }
+        & "$isccPath" "/DMyAppVersion=$($env:APP_VERSION)" installer\posronda_setup.iss
+        if (Test-Path "PosRonda-v$($env:APP_VERSION)-Setup.exe") {
+          Write-Host "✔ Installer resmi Windows berhasil dibuat: PosRonda-v$($env:APP_VERSION)-Setup.exe"
+        } else {
+          Write-Warning "Inno Setup installer tidak ditemukan di root direktori."
+        }
+
+    - name: 11. Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: PosRonda-Windows-v${{ env.APP_VERSION }}
         path: |
+          PosRonda-v*-Setup.exe
           dist/PosRonda-Full.exe
           dist/PosRonda-Lite.exe
           PosRonda-v*.zip
@@ -114,7 +131,7 @@ jobs:
           docs/PANDUAN.md
         retention-days: 30
 
-    - name: 11. Publish GitHub Release
+    - name: 12. Publish GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ env.APP_VERSION }}
@@ -125,30 +142,34 @@ jobs:
           ### PosRonda v${{ env.APP_VERSION }} - Surveillance Hub & Live Streaming Engine
 
           Rilis resmi aplikasi PosRonda v${{ env.APP_VERSION }} untuk sistem operasi Windows 64-bit.
-          Tersedia dalam dua varian instalasi:
 
           ---
 
           ### 📦 Pilihan Unduhan:
 
-          #### 1. PosRonda Full Edition (Rekomendasi Utama untuk Semua Pengguna)
-          *Paket all-in-one tanpa instalasi dependensi tambahan. Python & FFmpeg sudah terintegrasi.*
-          - **[PosRonda-v${{ env.APP_VERSION }}-Full.zip](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-v${{ env.APP_VERSION }}-Full.zip)**: Paket ZIP lengkap berisi `PosRonda.exe`, `ffmpeg.exe`, `config.json`, dan `PANDUAN.md`.
-          - **[PosRonda-Full.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-Full.exe)**: Biner mandiri tunggal dengan FFmpeg terintegrasi di dalamnya.
+          #### 🌟 1. PosRonda Official Setup Installer (Rekomendasi Utama)
+          *Installer Windows resmi dengan **progress bar instalasi visual**, pembuatan icon Desktop, Start Menu, dan uninstaller bersih.*
+          - **[PosRonda-v${{ env.APP_VERSION }}-Setup.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-v${{ env.APP_VERSION }}-Setup.exe)**: Installer wizard berpenampilan resmi dengan progress bar.
 
-          #### 2. PosRonda Lite Edition (Untuk Teknisi / Laptop dengan FFmpeg)
-          *Ukuran unduhan lebih hemat (~99 MB) bagi laptop yang sudah terpasang FFmpeg di sistemnya.*
+          #### 2. PosRonda Full Edition (Portable / Mandiri)
+          *Tanpa perlu instalasi. Dilengkapi Splash Screen loading instan dan FFmpeg internal.*
+          - **[PosRonda-v${{ env.APP_VERSION }}-Full.zip](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-v${{ env.APP_VERSION }}-Full.zip)**: Paket ZIP lengkap berisi `PosRonda.exe`, `ffmpeg.exe`, `config.json`, dan `PANDUAN.md`.
+          - **[PosRonda-Full.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-Full.exe)**: File executable mandiri (All-in-One).
+
+          #### 3. PosRonda Lite Edition (Untuk Teknisi / Hemat Kuota)
+          *Ukuran unduhan lebih hemat (~99 MB) bagi laptop yang sudah terpasang FFmpeg.*
           - **[PosRonda-v${{ env.APP_VERSION }}-Lite.zip](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-v${{ env.APP_VERSION }}-Lite.zip)**: Paket ZIP biner PosRonda ringan.
           - **[PosRonda-Lite.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-Lite.exe)**: Biner mandiri Lite.
 
           ---
 
-          ### ⚙️ Catatan Sistem:
-          - **Python**: **TIDAK PERLU DIINSTAL**. Seluruh runtime Python 3.11 dan modul OpenCV sudah terbungkus secara terisolasi di dalam executable.
-          - **FFmpeg**:
-            - Versi **Full**: Sudah mencakup FFmpeg resmi dengan akselerasi hardware Intel QuickSync (`h264_qsv`) dan `libx264`.
-            - Versi **Lite**: Otomatis mendeteksi FFmpeg yang sudah ada di System PATH laptop Anda. Jika belum ada, Anda bisa memilih file `ffmpeg.exe` lewat tombol di aplikasi untuk disalin otomatis ke folder PosRonda.
+          ### ⚙️ Catatan Sistem & Perbaikan Baru di v${{ env.APP_VERSION }}:
+          - **Progress Bar & Setup Wizard**: Tersedia `PosRonda-Setup.exe` dengan indikator kemajuan instalasi.
+          - **Instant Splash Screen**: File executable kini langsung memunculkan splash screen pemuatan saat diklik dua kali.
+          - **Salin Log Error**: Setiap pesan error kini dilengkapi tombol **📋 Salin Log Error** untuk kemudahan diagnosa teknis.
+          - **YouTube Live 403 Handler**: Penjelasan ramah pengguna dan panduan aktivasi YouTube Studio jika fitur live belum diaktifkan pada akun YouTube.
         files: |
+          PosRonda-v*-Setup.exe
           PosRonda-v*.zip
           dist/PosRonda-Full.exe
           dist/PosRonda-Lite.exe

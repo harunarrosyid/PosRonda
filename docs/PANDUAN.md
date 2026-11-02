@@ -1,4 +1,4 @@
-# Panduan Penggunaan: PosRonda v4.1.1
+# Panduan Penggunaan: PosRonda v4.2.0
 
 Dokumentasi penggunaan dan konfigurasi aplikasi pemantau CCTV multi-kamera PosRonda.
 

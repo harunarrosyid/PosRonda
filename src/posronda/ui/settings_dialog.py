@@ -59,6 +59,15 @@ except ImportError:
         YouTubeManager = None
 
 try:
+    from posronda.ui.error_dialog import show_error_dialog
+except ImportError:
+    try:
+        from error_dialog import show_error_dialog
+    except ImportError:
+        def show_error_dialog(parent, title, message, error_details=None, action_url=None, action_url_label=None):
+            messagebox.showerror(title, f"{message}\n\nDetail:\n{error_details or ''}", parent=parent)
+
+try:
     from posronda import __version__
 except Exception:
     __version__ = "4.1.0"
@@ -941,8 +950,16 @@ class SettingsDialog(tk.Toplevel):
                 else:
                     self.after(0, lambda: messagebox.showwarning("Peringatan YouTube API", message, parent=self))
             except Exception as e:
-                err_text = str(e)
-                self.after(0, lambda: messagebox.showerror("Gagal Tes", f"Error YouTube API:\n{err_text}", parent=self))
+                import traceback
+                err_text = traceback.format_exc()
+                self.after(0, lambda: show_error_dialog(
+                    self,
+                    "Gagal Tes YouTube API",
+                    f"Terjadi kesalahan saat menghubungi server YouTube API:\n{e}",
+                    error_details=err_text,
+                    action_url="https://studio.youtube.com",
+                    action_url_label="🌐 Buka YouTube Studio"
+                ))
 
         threading.Thread(target=run_test, daemon=True).start()
 
@@ -962,11 +979,38 @@ class SettingsDialog(tk.Toplevel):
                 except ImportError:
                     from youtube_manager import YouTubeManager
 
-                yt = YouTubeManager(self.cfg)
-                ok, msg = yt.cleanup_all_upcoming()
-                self.after(0, lambda: messagebox.showinfo("Pembersihan Selesai", msg, parent=self))
+                temp_cfg = dict(self.cfg)
+                temp_cfg.setdefault("youtube_api", {})["client_secrets_file"] = secret_file
+                yt = YouTubeManager(temp_cfg)
+                res = yt.cleanup_all_upcoming()
+                if isinstance(res, tuple) and len(res) == 3:
+                    ok, msg, err_log = res
+                else:
+                    ok, msg = res
+                    err_log = None
+
+                if ok:
+                    self.after(0, lambda: messagebox.showinfo("Pembersihan Selesai", msg, parent=self))
+                else:
+                    self.after(0, lambda: show_error_dialog(
+                        self,
+                        "Gagal Hapus Upcoming",
+                        msg,
+                        error_details=err_log or msg,
+                        action_url="https://studio.youtube.com",
+                        action_url_label="🌐 Buka YouTube Studio"
+                    ))
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Error", str(e), parent=self))
+                import traceback
+                err_trace = traceback.format_exc()
+                self.after(0, lambda: show_error_dialog(
+                    self,
+                    "Error Hapus Upcoming",
+                    f"Terjadi kegagalan saat proses pembersihan upcoming:\n{e}",
+                    error_details=err_trace,
+                    action_url="https://studio.youtube.com",
+                    action_url_label="🌐 Buka YouTube Studio"
+                ))
 
         threading.Thread(target=run_cleanup, daemon=True).start()
 
@@ -986,11 +1030,38 @@ class SettingsDialog(tk.Toplevel):
                 except ImportError:
                     from youtube_manager import YouTubeManager
 
-                yt = YouTubeManager(self.cfg)
-                ok, msg = yt.cleanup_active_live_broadcasts(only_cctv_prefix=False)
-                self.after(0, lambda: messagebox.showinfo("Pembersihan Siaran Live Selesai", msg, parent=self))
+                temp_cfg = dict(self.cfg)
+                temp_cfg.setdefault("youtube_api", {})["client_secrets_file"] = secret_file
+                yt = YouTubeManager(temp_cfg)
+                res = yt.cleanup_active_live_broadcasts(only_cctv_prefix=False)
+                if isinstance(res, tuple) and len(res) == 3:
+                    ok, msg, err_log = res
+                else:
+                    ok, msg = res
+                    err_log = None
+
+                if ok:
+                    self.after(0, lambda: messagebox.showinfo("Pembersihan Siaran Live Selesai", msg, parent=self))
+                else:
+                    self.after(0, lambda: show_error_dialog(
+                        self,
+                        "Gagal Tutup Siaran Zombie",
+                        msg,
+                        error_details=err_log or msg,
+                        action_url="https://studio.youtube.com",
+                        action_url_label="🌐 Buka YouTube Studio"
+                    ))
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Error", str(e), parent=self))
+                import traceback
+                err_trace = traceback.format_exc()
+                self.after(0, lambda: show_error_dialog(
+                    self,
+                    "Error Siaran Zombie",
+                    f"Terjadi kegagalan saat menutup siaran live menggantung:\n{e}",
+                    error_details=err_trace,
+                    action_url="https://studio.youtube.com",
+                    action_url_label="🌐 Buka YouTube Studio"
+                ))
 
         threading.Thread(target=run_cleanup_live, daemon=True).start()
 

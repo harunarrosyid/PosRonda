@@ -18,7 +18,7 @@ def get_base_dir():
 DEFAULT_CONFIG = {
     "app_name": "PosRonda",
     "app_tagline": "Autonomous CCTV Multi-Camera Hub & YouTube Streaming Engine",
-    "version": "4.1.1",
+    "version": "4.2.0",
     "default_camera_credentials": {
         "username": "admin",
         "password": "",

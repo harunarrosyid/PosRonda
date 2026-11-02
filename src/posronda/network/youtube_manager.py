@@ -97,7 +97,7 @@ class YouTubeManager:
         else:
             msg += "\nℹ️ Playlist ID kosong (Video tidak akan otomatis dimasukkan ke playlist)."
 
-        # 3. Coba deteksi stream key yang sudah ada di channel ini
+        # 3. Coba deteksi stream key yang sudah ada di channel ini & cek izin live streaming
         stream_key = None
         try:
             s_resp = self.service.liveStreams().list(part="cdn,snippet", mine=True, maxResults=5).execute()
@@ -106,8 +106,20 @@ class YouTubeManager:
                 stream_key = s_items[0]["cdn"]["ingestionInfo"]["streamName"]
                 masked_key = stream_key[:4] + "****" if len(stream_key) > 4 else "****"
                 msg += f"\n✔ Stream Key YouTube terdeteksi: {masked_key}"
-        except Exception:
-            pass
+            else:
+                msg += "\nℹ️ Belum ada stream key aktif di YouTube Studio."
+        except Exception as se:
+            err_str = str(se)
+            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
+                msg += (
+                    "\n\n⚠️ PERINGATAN PENTING: Fitur Live Streaming BELUM AKTIF pada Channel ini!"
+                    "\n   Google melaporkan izin live streaming belum terbuka untuk akun ini."
+                    "\n   Langkah Aktivasi:"
+                    "\n   1. Buka https://studio.youtube.com"
+                    "\n   2. Klik 'Create' (Buat) -> 'Go Live' (Mulai Siaran)"
+                    "\n   3. Lakukan verifikasi nomor HP yang diminta YouTube"
+                    "\n   4. Tunggu masa aktivasi hingga 24 jam dari pihak YouTube."
+                )
 
         return True, msg, stream_key
 
@@ -233,9 +245,49 @@ class YouTubeManager:
                 if not next_page_token:
                     break
 
-            return True, f"Berhasil menghapus {deleted_count} siaran 'Upcoming' yang menumpuk di YouTube Studio!"
+            return True, f"Berhasil menghapus {deleted_count} siaran 'Upcoming' yang menumpuk di YouTube Studio!", None
         except Exception as e:
-            return False, f"Terjadi kesalahan saat membersihkan: {e}"
+            err_str = str(e)
+            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str or "403" in err_str:
+                # Coba metode alternatif: Cari melalui Video API (search.list untuk upcoming)
+                try:
+                    print("[YouTube API] Mencoba pembersihan upcoming melalui Video Search API...")
+                    s_resp = self.service.search().list(
+                        part="id,snippet",
+                        forMine=True,
+                        eventType="upcoming",
+                        type="video",
+                        maxResults=50
+                    ).execute()
+                    s_items = s_resp.get("items", [])
+                    if s_items:
+                        for s_item in s_items:
+                            vid_id = s_item["id"].get("videoId")
+                            v_title = s_item.get("snippet", {}).get("title", "")
+                            if only_cctv_prefix and self.title_prefix.lower() not in v_title.lower():
+                                continue
+                            if vid_id:
+                                try:
+                                    self.service.videos().delete(id=vid_id).execute()
+                                    deleted_count += 1
+                                    print(f"[YouTube API] Terhapus upcoming video: {v_title} ({vid_id})")
+                                except Exception as de:
+                                    print(f"[YouTube API] Gagal hapus video {vid_id}: {de}")
+                        if deleted_count > 0:
+                            return True, f"Berhasil menghapus {deleted_count} siaran 'Upcoming' via Video API!", None
+                except Exception as fe:
+                    print(f"[YouTube API] Fallback Video Search API gagal: {fe}")
+
+                return False, (
+                    "Fitur Live Streaming belum aktif pada Channel YouTube Anda di YouTube Studio (Error 403 liveStreamingNotEnabled).\n\n"
+                    "Langkah aktivasi:\n"
+                    "1. Buka https://studio.youtube.com\n"
+                    "2. Klik 'Create' (Buat) -> 'Go Live' (Mulai Siaran Langsung)\n"
+                    "3. Lakukan verifikasi nomor HP sesuai instruksi YouTube\n"
+                    "4. Tunggu masa aktivasi hingga 24 jam sampai YouTube mengaktifkan fitur live streaming untuk channel Anda."
+                ), err_str
+
+            return False, f"Terjadi kesalahan saat membersihkan siaran upcoming:\n{e}", err_str
 
     def cleanup_active_live_broadcasts(self, only_cctv_prefix=False, exclude_broadcast_id=None):
         """
@@ -310,11 +362,36 @@ class YouTubeManager:
             if closed_count > 0:
                 msg_parts.append(f"{closed_count} siaran live zombie ditutup menjadi arsip video")
             if not msg_parts:
-                return True, "Tidak ditemukan siaran live menggantung. Semua siaran di channel sudah bersih!"
-            return True, f"Berhasil membersihkan: {' dan '.join(msg_parts)}."
+                return True, "Tidak ditemukan siaran live menggantung. Semua siaran di channel sudah bersih!", None
+            return True, f"Berhasil membersihkan: {' dan '.join(msg_parts)}.", None
         except Exception as e:
+            err_str = str(e)
+            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str or "403" in err_str:
+                # Coba cari siaran live via Video search
+                try:
+                    s_resp = self.service.search().list(
+                        part="id,snippet",
+                        forMine=True,
+                        eventType="live",
+                        type="video",
+                        maxResults=25
+                    ).execute()
+                    if not s_resp.get("items"):
+                        return True, "Tidak ditemukan siaran live menggantung di channel Anda.", None
+                except Exception:
+                    pass
+
+                return False, (
+                    "Fitur Live Streaming belum aktif pada Channel YouTube Anda di YouTube Studio (Error 403 liveStreamingNotEnabled).\n\n"
+                    "Langkah aktivasi:\n"
+                    "1. Buka https://studio.youtube.com\n"
+                    "2. Klik 'Create' (Buat) -> 'Go Live' (Mulai Siaran Langsung)\n"
+                    "3. Lakukan verifikasi nomor HP yang diminta YouTube\n"
+                    "4. Tunggu masa aktivasi hingga 24 jam agar YouTube mengaktifkan izin streaming."
+                ), err_str
+
             print(f"[YouTube API] Error saat membersihkan siaran: {e}")
-            return False, f"Terjadi kesalahan saat membersihkan: {e}"
+            return False, f"Terjadi kesalahan saat membersihkan siaran:\n{e}", err_str
 
     def create_broadcast_and_stream(self, custom_title=None, force_new=True):
         """Membuat Live Broadcast baru di YouTube dan otomatis membersihkan siaran upcoming lama yang menumpuk"""
