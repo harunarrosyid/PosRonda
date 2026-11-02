@@ -290,7 +290,6 @@ class CCTVApp:
         self.root.bind("<F6>", lambda e: self.toggle_pause())
         self.root.bind("<F7>", lambda e: self.end_streaming())
         self.root.bind("<F9>", lambda e: self.toggle_eco_mode())
-        self.root.bind("<f9>", lambda e: self.toggle_eco_mode())
 
         # Shortcut Patrol / Ganti Halaman Kamera
         self.root.bind("<space>", lambda e: self.switch_camera_page())

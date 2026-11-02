@@ -1,7 +1,7 @@
 {
     "app_name": "PosRonda",
     "app_tagline": "Autonomous CCTV Multi-Camera Hub & YouTube Streaming Engine",
-    "version": "4.1",
+    "version": "4.1.1",
     "default_camera_credentials": {
         "username": "admin",
         "password": "",
