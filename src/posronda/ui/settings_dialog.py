@@ -148,9 +148,40 @@ class SettingsDialog(tk.Toplevel):
         bottom_bar = tk.Frame(self, bg="#0b0f19", padx=16, pady=10)
         bottom_bar.pack(fill="x")
 
+        # Tombol Backup & Restore di sebelah kiri
+        btn_export = tk.Button(
+            bottom_bar,
+            text="📤 Backup Pengaturan",
+            bg="#1e293b",
+            fg="#38bdf8",
+            activebackground="#334155",
+            activeforeground="#7dd3fc",
+            font=("Segoe UI", 8, "bold"),
+            relief="flat",
+            padx=10, pady=6,
+            cursor="hand2",
+            command=self.export_config
+        )
+        btn_export.pack(side="left", padx=(0, 6))
+
+        btn_import = tk.Button(
+            bottom_bar,
+            text="📥 Impor Pengaturan",
+            bg="#1e293b",
+            fg="#a78bfa",
+            activebackground="#334155",
+            activeforeground="#c4b5fd",
+            font=("Segoe UI", 8, "bold"),
+            relief="flat",
+            padx=10, pady=6,
+            cursor="hand2",
+            command=self.import_config
+        )
+        btn_import.pack(side="left", padx=(0, 8))
+
         lbl_esc_hint = tk.Label(
             bottom_bar,
-            text="PosRonda Hub v4.0 • Autonomous Multi-Camera & Private Stream Engine",
+            text="PosRonda v4.0",
             bg="#0b0f19", fg="#64748b", font=("Segoe UI", 8)
         )
         lbl_esc_hint.pack(side="left")
@@ -164,7 +195,7 @@ class SettingsDialog(tk.Toplevel):
             activeforeground="#ffffff",
             font=("Segoe UI", 9, "bold"),
             relief="flat", 
-            padx=18, pady=7,
+            padx=16, pady=6,
             cursor="hand2",
             command=self.save_all
         )
@@ -179,7 +210,7 @@ class SettingsDialog(tk.Toplevel):
             activeforeground="#ffffff",
             font=("Segoe UI", 9),
             relief="flat", 
-            padx=14, pady=7,
+            padx=12, pady=6,
             cursor="hand2",
             command=self.destroy
         )
@@ -1194,7 +1225,8 @@ class SettingsDialog(tk.Toplevel):
             except Exception:
                 webbrowser.open_new("https://ngulonstudio.web.id")
 
-    def save_all(self):
+    def collect_form_data(self):
+        """Membaca semua input dari tab pengaturan ke dalam dictionary self.cfg"""
         new_cams = []
         for i, (ent_name, ent_url) in enumerate(self.cam_entries):
             url_val = ent_url.get().strip()
@@ -1310,6 +1342,67 @@ class SettingsDialog(tk.Toplevel):
             except Exception as e:
                 print(f"[Settings] Error set autostart: {e}")
 
-        # Terapkan konfigurasi
+        return self.cfg
+
+    def save_all(self):
+        self.collect_form_data()
         self.on_save(self.cfg)
         self.destroy()
+
+    def export_config(self):
+        """Mengekspor pengaturan saat ini ke file JSON untuk cadangan / backup"""
+        self.collect_form_data()
+        default_name = f"PosRonda_Config_Backup_{time.strftime('%Y%m%d')}.json"
+        target_path = filedialog.asksaveasfilename(
+            parent=self,
+            title="Simpan Cadangan Pengaturan PosRonda",
+            defaultextension=".json",
+            filetypes=[("File Cadangan JSON (*.json)", "*.json"), ("Semua File", "*.*")],
+            initialfile=default_name
+        )
+        if target_path:
+            ok, msg = config_manager.export_config(self.cfg, target_path)
+            if ok:
+                messagebox.showinfo(
+                    "Cadangan Berhasil",
+                    f"Pengaturan berhasil diekspor ke:\n{target_path}\n\nSimpan file ini untuk dipulihkan jika Anda menginstal ulang aplikasi.",
+                    parent=self
+                )
+            else:
+                messagebox.showerror("Gagal Cadangkan", msg, parent=self)
+
+    def import_config(self):
+        """Mengimpor file cadangan JSON dan memulihkan seluruh konfigurasi"""
+        source_path = filedialog.askopenfilename(
+            parent=self,
+            title="Pilih File Cadangan Pengaturan PosRonda (.json)",
+            filetypes=[("File Cadangan JSON (*.json)", "*.json"), ("Semua File", "*.*")]
+        )
+        if source_path:
+            ok, msg, imported_cfg = config_manager.import_config(source_path)
+            if not ok:
+                messagebox.showerror("Gagal Impor", msg, parent=self)
+                return
+
+            cams = imported_cfg.get("cameras", [])
+            valid_cams = [c for c in cams if c.get("enabled") and c.get("rtsp_url")]
+            mode = imported_cfg.get("streaming", {}).get("mode", "youtube")
+
+            confirm = messagebox.askyesno(
+                "Konfirmasi Pemulihan Cadangan",
+                f"File cadangan valid ditemukan:\n"
+                f"• {len(valid_cams)} Kamera aktif dari total {len(cams)} slot\n"
+                f"• Mode Streaming: {mode}\n\n"
+                f"Apakah Anda ingin menerapkan konfigurasi ini sekarang?",
+                parent=self
+            )
+            if confirm:
+                config_manager.save_config(imported_cfg)
+                self.cfg = imported_cfg
+                self.on_save(imported_cfg)
+                messagebox.showinfo(
+                    "Pemulihan Sukses",
+                    "Pengaturan berhasil dipulihkan! PosRonda kini aktif dengan konfigurasi cadangan Anda.",
+                    parent=self
+                )
+                self.destroy()

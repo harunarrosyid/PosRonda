@@ -111,15 +111,7 @@ def load_config():
             # Bersihkan kunci fitur usang agar config tetap ringkas & bebas ML overhead
             cfg.pop("ai_features", None)
 
-            # Deep merge dengan default agar kunci baru selalu terisi otomatis
-            def _deep_merge(target, default):
-                for k, v in default.items():
-                    if k not in target:
-                        target[k] = v
-                    elif isinstance(v, dict) and isinstance(target[k], dict):
-                        _deep_merge(target[k], v)
-
-            _deep_merge(cfg, DEFAULT_CONFIG)
+            deep_merge(cfg, DEFAULT_CONFIG)
             # Auto-extract default credentials from camera 1 if missing
             if not cfg.get("default_camera_credentials", {}).get("username") and cfg.get("cameras"):
                 first_url = cfg["cameras"][0].get("rtsp_url", "")
@@ -136,6 +128,41 @@ def load_config():
         print(f"Error membaca config.json: {e}, membuat config baru.")
         save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
+
+def deep_merge(target, default):
+    for k, v in default.items():
+        if k not in target:
+            target[k] = v
+        elif isinstance(v, dict) and isinstance(target[k], dict):
+            deep_merge(target[k], v)
+    return target
+
+def export_config(cfg, target_path):
+    """Mengekspor konfigurasi aktif ke file JSON tujuan (backup)."""
+    try:
+        with open(target_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=4)
+        return True, "Konfigurasi berhasil diekspor."
+    except Exception as e:
+        return False, f"Gagal mengekspor konfigurasi: {e}"
+
+def import_config(source_path):
+    """Mengimpor dan memvalidasi file backup JSON konfigurasi."""
+    try:
+        with open(source_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return False, "Format file tidak valid (harus objek JSON).", None
+
+        # Validasi struktur konfigurasi PosRonda
+        if "cameras" not in data and "streaming" not in data:
+            return False, "File JSON ini bukan backup konfigurasi PosRonda yang valid.", None
+
+        merged = deep_merge(data, DEFAULT_CONFIG)
+        merged.pop("ai_features", None)
+        return True, "Konfigurasi berhasil diimpor.", merged
+    except Exception as e:
+        return False, f"Gagal membaca file konfigurasi: {e}", None
 
 def save_config(cfg):
     try:

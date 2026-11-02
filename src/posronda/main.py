@@ -1035,7 +1035,9 @@ class CCTVApp:
         dlg.resizable(False, False)
         dlg.configure(bg="#0b0f19")
         dlg.transient(self.root)
+        dlg.grab_set()
         dlg.attributes("-topmost", True)
+        dlg.lift()
 
         # Center dialog pada posisi window utama
         dlg.update_idletasks()
@@ -1108,13 +1110,21 @@ class CCTVApp:
                 webbrowser.open_new(fallback_url)
 
         def on_enter_key():
+            try:
+                dlg.grab_release()
+            except Exception:
+                pass
             dlg.destroy()
             self.open_settings(initial_tab="license")
 
         def on_close():
+            try:
+                dlg.grab_release()
+            except Exception:
+                pass
             dlg.destroy()
 
-        # Tombol Beli Lisensi (Default Focus)
+        # Tombol Beli Lisensi (Fokus Utama & Border Sorotan)
         btn_buy = tk.Button(
             btn_bar,
             text="Beli Lisensi",
@@ -1126,8 +1136,13 @@ class CCTVApp:
             font=("Segoe UI", 9, "bold"),
             padx=14,
             pady=6,
-            relief="flat",
-            cursor="hand2"
+            relief="solid",
+            bd=2,
+            highlightthickness=2,
+            highlightbackground="#93c5fd",
+            highlightcolor="#60a5fa",
+            cursor="hand2",
+            default="active"
         )
         btn_buy.pack(side="left", padx=(0, 8))
 
@@ -1163,10 +1178,26 @@ class CCTVApp:
         )
         btn_close.pack(side="right")
 
+        dlg.protocol("WM_DELETE_WINDOW", on_close)
+
         # Focus otomatis ke tombol Beli Lisensi
         btn_buy.focus_set()
         dlg.bind("<Return>", lambda e: on_buy())
+        dlg.bind("<space>", lambda e: on_buy())
         dlg.bind("<Escape>", lambda e: on_close())
+
+        def _enforce_focus():
+            try:
+                if dlg.winfo_exists():
+                    dlg.lift()
+                    dlg.attributes("-topmost", True)
+                    dlg.focus_force()
+                    btn_buy.focus_set()
+            except Exception:
+                pass
+
+        dlg.after(50, _enforce_focus)
+        dlg.after(200, _enforce_focus)
 
     def open_about_dialog(self):
         lic = LicenseManager.get_license_info()
