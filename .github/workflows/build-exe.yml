@@ -3,7 +3,11 @@ name: Build PosRonda Windows EXE
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -46,12 +50,48 @@ jobs:
           exit 1
         fi
 
-    - name: 7. Upload Build Artifacts
+    - name: 7. Package Release Assets
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path release-pkg
+        Copy-Item dist\PosRonda.exe -Destination release-pkg\
+        Copy-Item config.json -Destination release-pkg\
+        Copy-Item docs\PANDUAN.md -Destination release-pkg\
+        Compress-Archive -Path release-pkg\* -DestinationPath PosRonda-v4.0.0-Windows.zip -Force
+
+    - name: 8. Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: PosRonda-Windows-v4.0
         path: |
           dist/PosRonda.exe
+          PosRonda-v4.0.0-Windows.zip
           config.json
           docs/PANDUAN.md
         retention-days: 30
+
+    - name: 9. Publish GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v4.0.0
+        name: "PosRonda v4.0.0 (Windows Release)"
+        body: |
+          ### PosRonda v4.0.0 - Surveillance Hub & Live Streaming Engine
+
+          Rilis resmi aplikasi PosRonda v4.0.0 untuk Windows 64-bit.
+
+          #### Unduhan:
+          - **PosRonda-v4.0.0-Windows.zip**: Paket lengkap siap pakai (berisi `PosRonda.exe`, `config.json`, dan `PANDUAN.md`).
+          - **PosRonda.exe**: Biner mandiri (standalone executable).
+
+          #### Persyaratan Sistem:
+          - Windows 10 atau Windows 11 (64-bit)
+          - **FFmpeg**:
+            - Jika laptop Anda sudah memiliki FFmpeg (terpasang di System PATH), PosRonda akan mendeteksinya secara otomatis dan langsung berjalan normal tanpa perlu install ulang.
+            - Jika belum ada di laptop, cukup unduh `ffmpeg-release-essentials.zip` dan letakkan file `ffmpeg.exe` satu folder dengan `PosRonda.exe`.
+          - Opsional: GPU Intel QuickSync (Gen 3 Core i3/i5/i7 ke atas) untuk akselerasi hardware.
+        files: |
+          PosRonda-v4.0.0-Windows.zip
+          dist/PosRonda.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -39,9 +39,13 @@ def check_ffmpeg():
     local_paths = [
         os.path.join(os.getcwd(), "ffmpeg.exe"),
         os.path.join(os.getcwd(), "ffmpeg", "bin", "ffmpeg.exe"),
+        os.path.join(os.getcwd(), "bin", "ffmpeg.exe"),
         os.path.join(root_candidate, "ffmpeg.exe"),
         os.path.join(root_candidate, "ffmpeg", "bin", "ffmpeg.exe"),
+        os.path.join(root_candidate, "bin", "ffmpeg.exe"),
         os.path.join(os.path.dirname(sys.executable), "ffmpeg.exe"),
+        os.path.join(os.path.dirname(sys.executable), "ffmpeg", "bin", "ffmpeg.exe"),
+        os.path.join(os.path.dirname(sys.executable), "bin", "ffmpeg.exe"),
         os.path.join(this_dir, "ffmpeg.exe"),
     ]
     for p in local_paths:

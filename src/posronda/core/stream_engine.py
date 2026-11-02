@@ -5,6 +5,7 @@ Mengelola 4 feed RTSP, Watchdog anti-freeze, compositing 2x2 grid, dan pipe ke F
 
 import os
 import sys
+import shutil
 
 # Standar Industri RTSP Capture: TCP, No-Buffer, Low-Delay, 1MB Socket Buffer, 5s Timeout (Anti-Freeze & Anti-Choke)
 # SANGAT PENTING: Harus disetel SEBELUM 'import cv2' dimuat ke memori!
@@ -479,10 +480,20 @@ class FFmpegStreamPusher:
         else: # "youtube"
             target = f"{self.rtmp_url.rstrip('/')}/{self.stream_key}"
 
-        ffmpeg_bin = "ffmpeg"
-        local_ff = os.path.join(base_dir, "ffmpeg.exe")
-        if os.path.exists(local_ff):
-            ffmpeg_bin = local_ff
+        # Prioritas pemilihan binary FFmpeg:
+        # 1. Folder lokal PosRonda (ffmpeg.exe atau ffmpeg/bin/ffmpeg.exe)
+        # 2. System PATH di komputer / laptop user (shutil.which)
+        # 3. Default fallback "ffmpeg"
+        ffmpeg_bin = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe") or "ffmpeg"
+        local_candidates = [
+            os.path.join(base_dir, "ffmpeg.exe"),
+            os.path.join(base_dir, "ffmpeg", "bin", "ffmpeg.exe"),
+            os.path.join(base_dir, "bin", "ffmpeg.exe"),
+        ]
+        for cand in local_candidates:
+            if os.path.exists(cand):
+                ffmpeg_bin = cand
+                break
 
         log_file_path = os.path.join(base_dir, "ffmpeg_log.txt")
 
