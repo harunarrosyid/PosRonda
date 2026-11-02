@@ -1,0 +1,83 @@
+{
+    "app_name": "PosRonda",
+    "app_tagline": "Autonomous CCTV Multi-Camera Hub & YouTube Streaming Engine",
+    "version": "4.0",
+    "default_camera_credentials": {
+        "username": "admin",
+        "password": "",
+        "default_port": 554
+    },
+    "cameras": [
+        {
+            "id": 1,
+            "name": "Kamera 1",
+            "rtsp_url": "rtsp://admin:admin123@192.168.1.101:554/live/ch0",
+            "enabled": true
+        },
+        {
+            "id": 2,
+            "name": "Kamera 2",
+            "rtsp_url": "rtsp://admin:admin123@192.168.1.102:554/live/ch0",
+            "enabled": true
+        },
+        {
+            "id": 3,
+            "name": "Kamera 3",
+            "rtsp_url": "rtsp://admin:admin123@192.168.1.103:554/live/ch0",
+            "enabled": true
+        },
+        {
+            "id": 4,
+            "name": "Kamera 4",
+            "rtsp_url": "rtsp://admin:admin123@192.168.1.104:554/live/ch0",
+            "enabled": true
+        }
+    ],
+    "auto_discover_camera_ip": false,
+    "streaming": {
+        "rtmp_server": "rtmp://a.rtmp.youtube.com/live2",
+        "stream_key": "",
+        "max_duration_hours": 11,
+        "rollover_lead_minutes": 5,
+        "encoder": "h264_qsv",
+        "x264_preset": "veryfast",
+        "fps": 25,
+        "bitrate_kbps": 1200,
+        "grid_resolution": "1280x720",
+        "rtsp_transport": "tcp",
+        "mode": "youtube",
+        "custom_rtmp_url": "rtmp://127.0.0.1:1935/live/posronda",
+        "local_record": {
+            "enabled": false,
+            "output_dir": "recordings",
+            "segment_minutes": 15,
+            "retention_days": 14
+        }
+    },
+    "osd": {
+        "enabled": true,
+        "font_scale": 0.42,
+        "position": "top_left",
+        "style": "badge_outline"
+    },
+    "youtube_api": {
+        "enabled": false,
+        "client_secrets_file": "client_secrets.json",
+        "token_file": "token.json",
+        "playlist_id": "",
+        "title_prefix": "CCTV Monitoring 24 Jam",
+        "privacy_status": "unlisted",
+        "latency_preference": "low",
+        "single_stream_mode": true
+    },
+    "telegram": {
+        "enabled": false,
+        "bot_token": "",
+        "chat_id": ""
+    },
+    "patrol": {
+        "enabled": false,
+        "interval_seconds": 15,
+        "layout": "2x2"
+    }
+}

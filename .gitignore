@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller build outputs
+build/
+dist/
+*.spec.bak
+
+# Large binary installers & executables (tidak boleh di-push ke GitHub karena >100MB)
+ffmpeg.exe
+ffprobe.exe
+python-3.11.9-amd64.exe
+update_*.zip
+
+# Local dynamic runtime logs & recordings
+ffmpeg_log.txt
+recordings/
+client_secrets.json
+token.json
+
+# OS specific files
+.DS_Store
+Thumbs.db
