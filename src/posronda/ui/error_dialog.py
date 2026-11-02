@@ -35,7 +35,7 @@ class ErrorDialog(tk.Toplevel):
         f_header = tk.Frame(self, bg="#1e1b4b", padx=16, pady=10)
         f_header.pack(fill="x")
 
-        lbl_icon = tk.Label(f_header, text="⚠️", bg="#1e1b4b", fg="#f87171", font=("Segoe UI", 16))
+        lbl_icon = tk.Label(f_header, text="[ERROR]", bg="#1e1b4b", fg="#f87171", font=("Segoe UI", 10, "bold"))
         lbl_icon.pack(side="left", padx=(0, 10))
 
         f_htext = tk.Frame(f_header, bg="#1e1b4b")
@@ -79,7 +79,7 @@ class ErrorDialog(tk.Toplevel):
         # Detail Log Header & Textbox
         tk.Label(
             f_body,
-            text="📋 Detail Teknis / Log Error Lengkap:",
+            text="Detail Teknis / Log Error Lengkap:",
             bg="#0b0f19",
             fg="#94a3b8",
             font=("Segoe UI", 8, "bold")
@@ -118,7 +118,7 @@ class ErrorDialog(tk.Toplevel):
 
         self.btn_copy = tk.Button(
             f_bottom,
-            text="📋 Salin Log Error",
+            text="Salin Log Error",
             bg="#3b82f6",
             fg="#ffffff",
             activebackground="#2563eb",
@@ -135,7 +135,7 @@ class ErrorDialog(tk.Toplevel):
         if self.action_url:
             btn_url = tk.Button(
                 f_bottom,
-                text=self.action_url_label or "🌐 Buka URL Bantuan",
+                text=self.action_url_label or "Buka Tautan Bantuan",
                 bg="#0284c7",
                 fg="#ffffff",
                 activebackground="#0369a1",
@@ -171,12 +171,12 @@ class ErrorDialog(tk.Toplevel):
             self.clipboard_append(self.full_log_text)
             self.update_idletasks()
             self.btn_copy.config(
-                text="✔ Log Berhasil Disalin!",
+                text="Log Berhasil Disalin!",
                 bg="#16a34a",
                 activebackground="#15803d"
             )
             self.after(2500, lambda: self.btn_copy.config(
-                text="📋 Salin Log Error",
+                text="Salin Log Error",
                 bg="#3b82f6",
                 activebackground="#2563eb"
             ))

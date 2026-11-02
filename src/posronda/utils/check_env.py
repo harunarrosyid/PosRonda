@@ -87,7 +87,7 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
 
     title_lbl = tk.Label(
         root, 
-        text="🛡️ Pemeriksaan Sistem PosRonda Hub", 
+        text="Pemeriksaan Sistem PosRonda Hub", 
         font=("Segoe UI", 16, "bold"), 
         bg="#0b0f19", 
         fg="#818cf8"
@@ -99,7 +99,7 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
 
     # Status Python
     py_color = "#4ade80" if py_ok else "#f87171"
-    py_icon = "✔" if py_ok else "✖"
+    py_icon = "[OK]" if py_ok else "[X]"
     lbl_py = tk.Label(frame, text=f"{py_icon} Status Python:", font=("Segoe UI", 11, "bold"), bg="#2b2d42", fg="#ffffff")
     lbl_py.grid(row=0, column=0, sticky="w", pady=5)
     lbl_py_val = tk.Label(frame, text=py_msg, font=("Segoe UI", 10), bg="#2b2d42", fg=py_color)
@@ -108,7 +108,7 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
     if not py_ok:
         btn_py = tk.Button(
             frame, 
-            text=f"⬇ Download {PYTHON_DOWNLOAD_NAME}", 
+            text=f"Download {PYTHON_DOWNLOAD_NAME}", 
             bg="#3b82f6", 
             fg="white", 
             font=("Segoe UI", 9, "bold"),
@@ -120,7 +120,7 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
 
     # Status FFmpeg
     ff_color = "#4ade80" if ffmpeg_ok else "#f87171"
-    ff_icon = "✔" if ffmpeg_ok else "✖"
+    ff_icon = "[OK]" if ffmpeg_ok else "[X]"
     lbl_ff = tk.Label(frame, text=f"{ff_icon} Status FFmpeg:", font=("Segoe UI", 11, "bold"), bg="#2b2d42", fg="#ffffff")
     lbl_ff.grid(row=2, column=0, sticky="w", pady=(15, 5))
     lbl_ff_val = tk.Label(frame, text=ffmpeg_msg, font=("Segoe UI", 10), bg="#2b2d42", fg=ff_color)
@@ -139,7 +139,7 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
 
         btn_ff = tk.Button(
             frame, 
-            text=f"⬇ Download {FFMPEG_DOWNLOAD_NAME}", 
+            text=f"Download {FFMPEG_DOWNLOAD_NAME}", 
             bg="#f59e0b", 
             fg="black", 
             font=("Segoe UI", 9, "bold"),
@@ -171,7 +171,7 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
 
         btn_browse = tk.Button(
             frame,
-            text="📁 Pilih File ffmpeg.exe dari Laptop (Disalin Otomatis)",
+            text="Pilih File ffmpeg.exe dari Laptop (Disalin Otomatis)",
             bg="#0284c7",
             fg="white",
             font=("Segoe UI", 9, "bold"),
@@ -216,8 +216,8 @@ def run_check(show_gui_if_missing=True):
 if __name__ == "__main__":
     is_ready = run_check(show_gui_if_missing=True)
     if is_ready:
-        print("✔ Sistem siap! Python dan FFmpeg terdeteksi.")
+        print("[OK] Sistem siap! Python dan FFmpeg terdeteksi.")
         sys.exit(0)
     else:
-        print("✖ Komponen belum lengkap. Silakan unduh melalui jendela dialog.")
+        print("[INFO] Komponen belum lengkap. Silakan unduh melalui jendela dialog.")
         sys.exit(1)

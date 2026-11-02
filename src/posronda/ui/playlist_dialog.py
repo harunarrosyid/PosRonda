@@ -31,7 +31,7 @@ class CreatePlaylistDialog(tk.Toplevel):
         f_head.pack(fill="x")
         tk.Label(
             f_head,
-            text="➕ Buat Playlist Baru di Channel YouTube",
+            text="Buat Playlist Baru di Channel YouTube",
             bg="#1e1b4b", fg="#818cf8",
             font=("Segoe UI", 10, "bold")
         ).pack(anchor="w")
@@ -85,7 +85,7 @@ class CreatePlaylistDialog(tk.Toplevel):
 
         self.btn_submit = tk.Button(
             f_bot,
-            text="💾 Simpan & Buat Playlist",
+            text="Simpan & Buat Playlist",
             bg="#0284c7", fg="#ffffff",
             activebackground="#0369a1", activeforeground="#ffffff",
             font=("Segoe UI", 8, "bold"),
@@ -121,7 +121,7 @@ class CreatePlaylistDialog(tk.Toplevel):
             messagebox.showwarning("Judul Kosong", "Harap masukkan judul playlist!", parent=self)
             return
 
-        self.btn_submit.config(text="⏳ Membuat di YouTube...", state="disabled")
+        self.btn_submit.config(text="Memproses ke YouTube...", state="disabled")
 
         def run_create():
             try:
@@ -145,7 +145,7 @@ class CreatePlaylistDialog(tk.Toplevel):
     def _on_success(self, new_pl):
         messagebox.showinfo(
             "Playlist Berhasil Dibuat",
-            f"✔ Playlist YouTube Berhasil Dibuat!\n\n"
+            f"Playlist YouTube Berhasil Dibuat!\n\n"
             f"• Judul: {new_pl['title']}\n"
             f"• ID: {new_pl['id']}\n"
             f"• Privasi: {new_pl['privacy'].title()}\n\n"
@@ -157,7 +157,7 @@ class CreatePlaylistDialog(tk.Toplevel):
         self.destroy()
 
     def _on_failure(self, err_text):
-        self.btn_submit.config(text="💾 Simpan & Buat Playlist", state="normal")
+        self.btn_submit.config(text="Simpan & Buat Playlist", state="normal")
         try:
             from posronda.ui.error_dialog import show_error_dialog
             show_error_dialog(
@@ -166,7 +166,7 @@ class CreatePlaylistDialog(tk.Toplevel):
                 "Terjadi kesalahan saat memproses pembuatan playlist melalui YouTube Data API.",
                 error_details=err_text,
                 action_url="https://studio.youtube.com",
-                action_url_label="🌐 Buka YouTube Studio"
+                action_url_label="Buka YouTube Studio"
             )
         except Exception:
             messagebox.showerror("Gagal Membuat Playlist", str(err_text), parent=self)

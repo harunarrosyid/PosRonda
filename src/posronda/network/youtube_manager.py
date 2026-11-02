@@ -79,7 +79,7 @@ class YouTubeManager:
             return False, "Kredensial valid, namun tidak ditemukan Channel YouTube aktif di akun ini.", None
 
         channel_name = items[0]["snippet"]["title"]
-        msg = f"✔ Berhasil terhubung ke Channel: '{channel_name}'"
+        msg = f"[OK] Berhasil terhubung ke Channel: '{channel_name}'"
 
         # 2. Cek Playlist jika diisi
         target_pl = playlist_id or self.playlist_id
@@ -89,13 +89,13 @@ class YouTubeManager:
                 pl_items = pl_resp.get("items", [])
                 if pl_items:
                     pl_title = pl_items[0]["snippet"]["title"]
-                    msg += f"\n✔ Playlist Valid: '{pl_title}' (ID: {target_pl})"
+                    msg += f"\n[OK] Playlist Valid: '{pl_title}' (ID: {target_pl})"
                 else:
-                    msg += f"\n⚠️ Playlist ID '{target_pl}' tidak ditemukan atau bersifat private."
+                    msg += f"\n[PERINGATAN] Playlist ID '{target_pl}' tidak ditemukan atau bersifat private."
             except Exception as e:
-                msg += f"\n⚠️ Gagal memverifikasi Playlist: {e}"
+                msg += f"\n[PERINGATAN] Gagal memverifikasi Playlist: {e}"
         else:
-            msg += "\nℹ️ Playlist ID kosong (Video tidak akan otomatis dimasukkan ke playlist)."
+            msg += "\n[INFO] Playlist ID kosong (Video tidak akan otomatis dimasukkan ke playlist)."
 
         # 3. Coba deteksi stream key yang sudah ada di channel ini & cek izin live streaming
         stream_key = None
@@ -105,14 +105,14 @@ class YouTubeManager:
             if s_items:
                 stream_key = s_items[0]["cdn"]["ingestionInfo"]["streamName"]
                 masked_key = stream_key[:4] + "****" if len(stream_key) > 4 else "****"
-                msg += f"\n✔ Stream Key YouTube terdeteksi: {masked_key}"
+                msg += f"\n[OK] Stream Key YouTube terdeteksi: {masked_key}"
             else:
-                msg += "\nℹ️ Belum ada stream key aktif di YouTube Studio."
+                msg += "\n[INFO] Belum ada stream key aktif di YouTube Studio."
         except Exception as se:
             err_str = str(se)
             if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
                 msg += (
-                    "\n\n⚠️ PERINGATAN PENTING: Fitur Live Streaming BELUM AKTIF pada Channel ini!"
+                    "\n\n[PERINGATAN PENTING] Fitur Live Streaming BELUM AKTIF pada Channel ini!"
                     "\n   Google melaporkan izin live streaming belum terbuka untuk akun ini."
                     "\n   Langkah Aktivasi:"
                     "\n   1. Buka https://studio.youtube.com"
@@ -417,7 +417,7 @@ class YouTubeManager:
                             part="status"
                         ).execute()
                         closed_count += 1
-                        print(f"[YouTube API] ✔ Siaran live {b_id} berhasil DITUTUP menjadi arsip (complete).")
+                        print(f"[YouTube API] Siaran live {b_id} berhasil DITUTUP menjadi arsip (complete).")
                     except Exception as te:
                         print(f"[YouTube API] Transisi complete {b_id} gagal ({te}), mencoba unbind & hapus...")
                         try:
@@ -427,7 +427,7 @@ class YouTubeManager:
                         try:
                             self.service.liveBroadcasts().delete(id=b_id).execute()
                             closed_count += 1
-                            print(f"[YouTube API] ✔ Siaran {b_id} berhasil dihapus.")
+                            print(f"[YouTube API] Siaran {b_id} berhasil dihapus.")
                         except Exception as de:
                             print(f"[YouTube API] Gagal hapus {b_id}: {de}")
 
@@ -605,7 +605,7 @@ class YouTubeManager:
                     b_status = b_items[0]["status"].get("lifeCycleStatus")
                     print(f"[YouTube API] Status Broadcast: '{b_status}' (Cek ke-{attempt+1}/{max_retries})")
                     if b_status in ["live", "liveStarting"]:
-                        print(f"[YouTube API] ✔ Siaran {broadcast_id} RESMI LIVE ({b_status})!")
+                        print(f"[YouTube API] Siaran {broadcast_id} RESMI LIVE ({b_status})!")
                         if on_live_callback:
                             try:
                                 on_live_callback()
@@ -624,7 +624,7 @@ class YouTubeManager:
                                 id=broadcast_id,
                                 part="status"
                             ).execute()
-                            print(f"[YouTube API] ✔ Transisi dari testing ke LIVE berhasil!")
+                            print(f"[YouTube API] Transisi dari testing ke LIVE berhasil!")
                             if on_live_callback:
                                 try:
                                     on_live_callback()
@@ -666,7 +666,7 @@ class YouTubeManager:
                             id=broadcast_id,
                             part="status"
                         ).execute()
-                        print(f"[YouTube API] ✔ SUKSES! Siaran {broadcast_id} resmi menjadi LIVE!")
+                        print(f"[YouTube API] SUKSES! Siaran {broadcast_id} resmi menjadi LIVE!")
                         if on_live_callback:
                             try:
                                 on_live_callback()

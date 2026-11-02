@@ -39,10 +39,10 @@ class TelegramNotifier:
         youtube_link = f"https://youtu.be/{broadcast_id}?t={elapsed_seconds}s" if broadcast_id else "Siaran Langsung"
 
         caption = (
-            f"🚨 <b>PERINGATAN DETEKSI CCTV</b>\n\n"
-            f"📍 <b>Lokasi:</b> {cam_name}\n"
-            f"⏱️ <b>Waktu Siaran:</b> Menit {time_str}\n"
-            f"🔗 <b>Tonton Detik Ini:</b> <a href='{youtube_link}'>Klik untuk Putar di YouTube</a>\n"
+            f"<b>[PERINGATAN DETEKSI CCTV]</b>\n\n"
+            f"<b>Lokasi:</b> {cam_name}\n"
+            f"<b>Waktu Siaran:</b> Menit {time_str}\n"
+            f"<b>Tonton:</b> <a href='{youtube_link}'>Klik untuk Putar di YouTube</a>\n"
         )
 
         url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"

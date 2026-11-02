@@ -551,7 +551,7 @@ class FFmpegStreamPusher:
                 if poll is None:
                     self.encoder = enc
                     self.preset = pre
-                    print(f"[FFmpeg] ✔ Encoder {enc} AKTIF & stabil mengalir ({self.mode}) @ {self.fps} FPS")
+                    print(f"[FFmpeg] Encoder {enc} AKTIF & stabil mengalir ({self.mode}) @ {self.fps} FPS")
 
                     if self.mode == "local_recording":
                         def _cleaner_loop():

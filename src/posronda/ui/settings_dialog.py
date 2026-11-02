@@ -130,7 +130,7 @@ class SettingsDialog(tk.Toplevel):
 
         lbl_app = tk.Label(
             f_title, 
-            text=f"🛡️ PosRonda v{__version__}", 
+            text=f"PosRonda v{__version__}", 
             bg="#1e1b4b", fg="#818cf8", 
             font=("Segoe UI", 11, "bold"), 
             padx=8, pady=2
@@ -148,10 +148,10 @@ class SettingsDialog(tk.Toplevel):
         # Pemilih Bahasa Dwibahasa (ID / EN)
         f_lang = tk.Frame(header, bg="#0f172a")
         f_lang.pack(side="right")
-        tk.Label(f_lang, text="🌐 Bahasa / Lang:", bg="#0f172a", fg="#94a3b8", font=("Segoe UI", 8)).pack(side="left", padx=(0, 4))
-        self.cmb_lang = ttk.Combobox(f_lang, values=["🇮🇩 Bahasa Indonesia", "🇬🇧 English"], state="readonly", width=19)
+        tk.Label(f_lang, text="Bahasa / Language:", bg="#0f172a", fg="#94a3b8", font=("Segoe UI", 8)).pack(side="left", padx=(0, 4))
+        self.cmb_lang = ttk.Combobox(f_lang, values=["Bahasa Indonesia", "English"], state="readonly", width=16)
         cur_lang = self.cfg.get("language", "id")
-        self.cmb_lang.set("🇮🇩 Bahasa Indonesia" if cur_lang == "id" else "🇬🇧 English")
+        self.cmb_lang.set("Bahasa Indonesia" if cur_lang == "id" else "English")
         self.cmb_lang.pack(side="left")
         self.cmb_lang.bind("<<ComboboxSelected>>", self.on_language_changed)
 
@@ -161,7 +161,7 @@ class SettingsDialog(tk.Toplevel):
         pill_fg = "#34d399" if lic_info.get("is_pro") else "#cbd5e1"
         lbl_lic_pill = tk.Label(
             header,
-            text=f"● {lic_info.get('tier_name')}",
+            text=f"LISENSI: {lic_info.get('tier_name')}",
             bg=pill_bg, fg=pill_fg,
             font=("Segoe UI", 8, "bold"),
             padx=8, pady=3
@@ -193,7 +193,7 @@ class SettingsDialog(tk.Toplevel):
         # Tombol Backup & Restore di sebelah kiri
         btn_export = tk.Button(
             bottom_bar,
-            text="📤 Backup Pengaturan",
+            text="Backup Pengaturan",
             bg="#1e293b",
             fg="#38bdf8",
             activebackground="#334155",
@@ -208,7 +208,7 @@ class SettingsDialog(tk.Toplevel):
 
         btn_import = tk.Button(
             bottom_bar,
-            text="📥 Impor Pengaturan",
+            text="Impor Pengaturan",
             bg="#1e293b",
             fg="#a78bfa",
             activebackground="#334155",
@@ -245,7 +245,7 @@ class SettingsDialog(tk.Toplevel):
 
         btn_save = tk.Button(
             bottom_bar, 
-            text="💾 Simpan & Terapkan Pengaturan", 
+            text="Simpan & Terapkan Pengaturan", 
             bg="#059669", 
             fg="#ffffff", 
             activebackground="#10b981", 
@@ -263,32 +263,32 @@ class SettingsDialog(tk.Toplevel):
 
         # Tab 1: Kamera CCTV (Auto-Scan & Patrol)
         tab_cam = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_cam, text="📷 Kamera & Patrol")
+        notebook.add(tab_cam, text="Kamera & Patrol")
         self.build_cam_tab(tab_cam)
 
         # Tab 2: Server & Tujuan Siaran (YouTube / Private RTMP / Local NAS)
         tab_server = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_server, text="🎯 Server & Siaran")
+        notebook.add(tab_server, text="Server & Siaran")
         self.build_server_tab(tab_server)
 
         # Tab 3: Kinerja & Hardware X230
         tab_perf = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_perf, text="⚡ Kinerja Hardware")
+        notebook.add(tab_perf, text="Kinerja Hardware")
         self.build_perf_tab(tab_perf)
 
         # Tab 4: Teks OSD & Layar
         tab_osd = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_osd, text="✍️ OSD & Teks")
+        notebook.add(tab_osd, text="OSD & Teks")
         self.build_osd_tab(tab_osd)
 
         # Tab 5: Notifikasi Telegram
         tab_tg = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_tg, text="✈ Telegram")
+        notebook.add(tab_tg, text="Telegram")
         self.build_tg_tab(tab_tg)
 
         # Tab 6: Lisensi
         tab_lic = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
-        notebook.add(tab_lic, text="💎 Lisensi")
+        notebook.add(tab_lic, text="Lisensi")
         self.build_license_tab(tab_lic)
 
         if getattr(self, "initial_tab", None) in ["license", "lic", 5]:
@@ -315,7 +315,7 @@ class SettingsDialog(tk.Toplevel):
 
         tk.Label(
             card_scan,
-            text="🔍 Pindai & Sambungkan Kamera Otomatis (Untuk Pengguna Awam)",
+            text="Pindai & Sambungkan Kamera Otomatis (Untuk Pengguna Awam)",
             bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")
         ).pack(anchor="w")
 
@@ -351,7 +351,7 @@ class SettingsDialog(tk.Toplevel):
         self.ent_cam_pwd.pack(side="left", padx=(4, 4))
 
         self.btn_toggle_pwd = tk.Button(
-            f_cred_row, text="👁️", bg="#334155", fg="#cbd5e1", relief="flat", font=("Segoe UI", 8),
+            f_cred_row, text="Lihat", bg="#334155", fg="#cbd5e1", relief="flat", font=("Segoe UI", 8),
             command=self.toggle_cam_password_visibility
         )
         self.btn_toggle_pwd.pack(side="left", padx=(0, 12))
@@ -366,7 +366,7 @@ class SettingsDialog(tk.Toplevel):
 
         self.btn_auto_connect = tk.Button(
             f_btn_scan,
-            text="🔍 PINDAI JARINGAN & SAMBUNGKAN SEMUA KAMERA OTOMATIS",
+            text="PINDAI JARINGAN & SAMBUNGKAN SEMUA KAMERA OTOMATIS",
             bg="#0284c7", fg="#ffffff",
             activebackground="#0369a1", activeforeground="#ffffff",
             font=("Segoe UI", 9, "bold"),
@@ -393,7 +393,7 @@ class SettingsDialog(tk.Toplevel):
         self.var_patrol_enabled = tk.BooleanVar(value=self.cfg.get("patrol", {}).get("enabled", False))
         chk_patrol = tk.Checkbutton(
             f_pat_top,
-            text="🔄 Aktifkan Mode Patrol / Rotasi Halaman Kamera Otomatis (> 4 Kamera)",
+            text="Aktifkan Mode Patrol / Rotasi Halaman Kamera Otomatis (> 4 Kamera)",
             variable=self.var_patrol_enabled,
             bg="#1e293b", fg="#ffffff", selectcolor="#0f172a",
             activebackground="#1e293b", activeforeground="#ffffff",
@@ -426,7 +426,7 @@ class SettingsDialog(tk.Toplevel):
 
         lbl_pat_hint = tk.Label(
             card_patrol,
-            text="💡 Sangat menghemat CPU/GPU! Jika punya 8 kamera, layar akan menampilkan Cam 1-4 lalu berganti ke Cam 5-8.\n"
+            text="Sangat menghemat CPU/GPU! Jika punya 8 kamera, layar akan menampilkan Cam 1-4 lalu berganti ke Cam 5-8.\n"
                  "   Anda juga bisa berpindah halaman secara manual dengan menekan tombol [Spasi] atau [Tab] di keyboard.",
             bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 8), justify="left"
         )
@@ -438,13 +438,13 @@ class SettingsDialog(tk.Toplevel):
 
         tk.Label(
             f_slots_head,
-            text="📺 Slot Kamera CCTV PosRonda",
+            text="Slot Kamera CCTV PosRonda",
             bg="#0f172a", fg="#f8fafc", font=("Segoe UI", 10, "bold")
         ).pack(side="left")
 
         btn_add_slot = tk.Button(
             f_slots_head,
-            text="➕ Tambah Slot Kamera",
+            text="Tambah Slot Kamera",
             bg="#1e293b", fg="#38bdf8",
             activebackground="#0284c7", activeforeground="#ffffff",
             font=("Segoe UI", 8, "bold"), relief="flat", padx=8, pady=2,
@@ -470,7 +470,7 @@ class SettingsDialog(tk.Toplevel):
 
         tk.Label(
             self.f_discovered_card,
-            text="📡 Hasil Deteksi Kamera di Jaringan Lokal (Wi-Fi / LAN)",
+            text="Hasil Deteksi Kamera di Jaringan Lokal (Wi-Fi / LAN)",
             bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 9, "bold")
         ).pack(anchor="w")
 
@@ -507,7 +507,7 @@ class SettingsDialog(tk.Toplevel):
 
         btn_test_single = tk.Button(
             f_top,
-            text="🧪 Uji Kamera",
+            text="Uji Kamera",
             bg="#334155", fg="#38bdf8",
             activebackground="#475569", activeforeground="#ffffff",
             relief="flat", font=("Segoe UI", 7),
@@ -518,7 +518,7 @@ class SettingsDialog(tk.Toplevel):
 
         btn_clear = tk.Button(
             f_top,
-            text="✖ Kosongkan",
+            text="Kosongkan",
             bg="#334155", fg="#f87171",
             activebackground="#475569", activeforeground="#ffffff",
             relief="flat", font=("Segoe UI", 7),
@@ -543,25 +543,25 @@ class SettingsDialog(tk.Toplevel):
             messagebox.showinfo("Batas Maksimal", "Maksimal 16 slot kamera telah tercapai.", parent=self)
             return
         self._create_single_slot_card(new_idx, {"name": f"Kamera {new_idx+1}", "rtsp_url": ""})
-        self.lbl_scan_indicator.config(text=f"✔ Slot {new_idx+1} berhasil ditambahkan!", fg="#4ade80")
+        self.lbl_scan_indicator.config(text=f"Slot {new_idx+1} berhasil ditambahkan!", fg="#4ade80")
 
     def toggle_cam_password_visibility(self):
         self.pwd_visible = not self.pwd_visible
         if self.pwd_visible:
             self.ent_cam_pwd.config(show="")
-            self.btn_toggle_pwd.config(text="🙈")
+            self.btn_toggle_pwd.config(text="Sembunyikan")
         else:
             self.ent_cam_pwd.config(show="*")
-            self.btn_toggle_pwd.config(text="👁️")
+            self.btn_toggle_pwd.config(text="Lihat")
 
     def toggle_stream_key_visibility(self):
         self.stream_key_visible = not self.stream_key_visible
         if self.stream_key_visible:
             self.ent_stream_key.config(show="")
-            self.btn_toggle_key.config(text="🙈")
+            self.btn_toggle_key.config(text="Sembunyikan")
         else:
             self.ent_stream_key.config(show="*")
-            self.btn_toggle_key.config(text="👁️")
+            self.btn_toggle_key.config(text="Lihat")
 
     def clear_slot(self, idx):
         if idx < len(self.cam_entries):
@@ -580,7 +580,7 @@ class SettingsDialog(tk.Toplevel):
             messagebox.showwarning("URL Kosong", f"Slot {cam_label} belum memiliki RTSP URL!", parent=self)
             return
 
-        self.lbl_scan_indicator.config(text=f"⏳ Menguji sinyal ke {cam_label} ({url})...", fg="#38bdf8")
+        self.lbl_scan_indicator.config(text=f"Menguji sinyal ke {cam_label} ({url})...", fg="#38bdf8")
 
         def _do_test():
             ip = onvif_scanner.extract_ip(url)
@@ -589,11 +589,11 @@ class SettingsDialog(tk.Toplevel):
             
             def _finish():
                 if ok:
-                    self.lbl_scan_indicator.config(text=f"✔ {cam_label} Berhasil Terhubung! Sinyal kamera aktif.", fg="#4ade80")
-                    messagebox.showinfo("Tes Koneksi Sukses", f"✔ Sinyal {cam_label} DITEMUKAN & AKTIF!\n\nURL: {url}\nRespon: {msg}", parent=self)
+                    self.lbl_scan_indicator.config(text=f"{cam_label} Berhasil Terhubung! Sinyal kamera aktif.", fg="#4ade80")
+                    messagebox.showinfo("Tes Koneksi Sukses", f"Sinyal {cam_label} DITEMUKAN & AKTIF!\n\nURL: {url}\nRespon: {msg}", parent=self)
                 else:
-                    self.lbl_scan_indicator.config(text=f"✖ {cam_label} Gagal: Kamera tidak merespons ({msg})", fg="#f87171")
-                    messagebox.showerror("Gagal Terhubung", f"✖ Gagal menghubungi {cam_label}!\n\nURL: {url}\nStatus: {msg}", parent=self)
+                    self.lbl_scan_indicator.config(text=f"{cam_label} Gagal: Kamera tidak merespons ({msg})", fg="#f87171")
+                    messagebox.showerror("Gagal Terhubung", f"Gagal menghubungi {cam_label}!\n\nURL: {url}\nStatus: {msg}", parent=self)
             self.after(0, _finish)
 
         threading.Thread(target=_do_test, daemon=True).start()
@@ -606,7 +606,7 @@ class SettingsDialog(tk.Toplevel):
         except Exception:
             port = 554
 
-        self.btn_auto_connect.config(state="disabled", text="⏳ MEMINDAI ONVIF & JARINGAN...")
+        self.btn_auto_connect.config(state="disabled", text="MEMINDAI ONVIF & JARINGAN...")
         self.lbl_scan_indicator.config(text="Sedang mengirim probe ONVIF WS-Discovery & memindai seluruh subnet lokal...", fg="#38bdf8")
 
         def _scan_thread():
@@ -614,13 +614,13 @@ class SettingsDialog(tk.Toplevel):
                 cams = onvif_scanner.scan_all_cameras(username=user, password=pwd, default_port=port, probe=True)
                 
                 def _on_done():
-                    self.btn_auto_connect.config(state="normal", text="🔍 PINDAI JARINGAN & SAMBUNGKAN SEMUA KAMERA OTOMATIS")
+                    self.btn_auto_connect.config(state="normal", text="PINDAI JARINGAN & SAMBUNGKAN SEMUA KAMERA OTOMATIS")
                     self.scanned_cams = cams
                     self.render_discovered_cams(cams)
 
                     if not cams:
                         self.lbl_scan_indicator.config(
-                            text="✖ Tidak ditemukan kamera CCTV dengan port RTSP/ONVIF aktif di jaringan ini.",
+                            text="Tidak ditemukan kamera CCTV dengan port RTSP/ONVIF aktif di jaringan ini.",
                             fg="#f87171"
                         )
                         messagebox.showwarning(
@@ -645,12 +645,12 @@ class SettingsDialog(tk.Toplevel):
                         ent_url.insert(0, cam["primary_url"])
 
                     self.lbl_scan_indicator.config(
-                        text=f"✔ Sukses! Ditemukan {len(cams)} kamera CCTV. {limit} kamera langsung dipasangkan ke Slot 1-{limit}!",
+                        text=f"Sukses! Ditemukan {len(cams)} kamera CCTV. {limit} kamera langsung dipasangkan ke Slot 1-{limit}!",
                         fg="#4ade80"
                     )
                     messagebox.showinfo(
                         "Kamera Berhasil Dipasang",
-                        f"✔ Berhasil mendeteksi {len(cams)} kamera CCTV di jaringan!\n\n"
+                        f"Berhasil mendeteksi {len(cams)} kamera CCTV di jaringan!\n\n"
                         f"Slot 1 sampai {limit} telah otomatis diisi dengan RTSP URL terotentikasi.",
                         parent=self
                     )
@@ -658,7 +658,7 @@ class SettingsDialog(tk.Toplevel):
                 self.after(0, _on_done)
             except Exception as e:
                 def _on_err(err=str(e)):
-                    self.btn_auto_connect.config(state="normal", text="🔍 PINDAI JARINGAN & SAMBUNGKAN SEMUA KAMERA OTOMATIS")
+                    self.btn_auto_connect.config(state="normal", text="PINDAI JARINGAN & SAMBUNGKAN SEMUA KAMERA OTOMATIS")
                     self.lbl_scan_indicator.config(text=f"Error saat scan: {err}", fg="#f87171")
                     messagebox.showerror("Error Scan", f"Terjadi kesalahan saat memindai: {err}", parent=self)
                 self.after(0, _on_err)
@@ -676,7 +676,7 @@ class SettingsDialog(tk.Toplevel):
         for i, cam in enumerate(cams):
             ip = cam["ip"]
             name = cam.get("name", f"Kamera {ip}")
-            verified_tag = "✔ Tervalidasi" if cam.get("verified") else "RTSP Terbuka"
+            verified_tag = "[OK] Tervalidasi" if cam.get("verified") else "RTSP Terbuka"
             
             row = tk.Frame(self.f_discovered_list, bg="#0f172a", pady=2)
             row.pack(fill="x")
@@ -694,7 +694,7 @@ class SettingsDialog(tk.Toplevel):
             for slot_idx in range(max_show):
                 btn_slot = tk.Button(
                     row, 
-                    text=f"➜ C{slot_idx+1}", 
+                    text=f"C{slot_idx+1}", 
                     bg="#1e293b", fg="#38bdf8", 
                     activebackground="#0284c7", activeforeground="#ffffff",
                     font=("Segoe UI", 7), relief="flat", padx=3,
@@ -710,7 +710,7 @@ class SettingsDialog(tk.Toplevel):
             ent_url.delete(0, tk.END)
             ent_url.insert(0, cam["primary_url"])
             self.lbl_scan_indicator.config(
-                text=f"✔ Kamera {cam['ip']} dipasangkan ke Slot {slot_idx+1}!",
+                text=f"Kamera {cam['ip']} dipasangkan ke Slot {slot_idx+1}!",
                 fg="#4ade80"
             )
 
@@ -741,7 +741,7 @@ class SettingsDialog(tk.Toplevel):
         c_mode = tk.Frame(scroll_frame, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
         c_mode.pack(fill="x", pady=(0, 10))
 
-        tk.Label(c_mode, text="🎯 Tujuan Siaran & Penyimpanan (Broadcast Destination)", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(c_mode, text="Tujuan Siaran & Penyimpanan (Broadcast Destination)", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w")
 
         f_mr = tk.Frame(c_mode, bg="#1e293b")
         f_mr.pack(fill="x", pady=(6, 4))
@@ -771,7 +771,7 @@ class SettingsDialog(tk.Toplevel):
 
         # 1. CARD PRIVATE RTMP (Untuk Klien Bonafide / Gengsi)
         self.c_private = tk.Frame(self.f_dynamic_server, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
-        tk.Label(self.c_private, text="🏢 Private Media Server / Custom RTMP (Untuk Klien Bonafide)", bg="#1e293b", fg="#34d399", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(self.c_private, text="Private Media Server / Custom RTMP (Untuk Klien Bonafide)", bg="#1e293b", fg="#34d399", font=("Segoe UI", 10, "bold")).pack(anchor="w")
         tk.Label(
             self.c_private,
             text="Solusi eksklusif tanpa logo YouTube! Mengalirkan feed ke server pribadi (MediaMTX / SRS / NGINX / VPS).\n"
@@ -796,7 +796,7 @@ class SettingsDialog(tk.Toplevel):
 
         # 2. CARD PEREKAMAN LOKAL HDD / NAS (Offline Tanpa Internet)
         self.c_local = tk.Frame(self.f_dynamic_server, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
-        tk.Label(self.c_local, text="💾 Perekaman Lokal Mandiri (Local HDD / NAS Storage)", bg="#1e293b", fg="#fbbf24", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(self.c_local, text="Perekaman Lokal Mandiri (Local HDD / NAS Storage)", bg="#1e293b", fg="#fbbf24", font=("Segoe UI", 10, "bold")).pack(anchor="w")
         tk.Label(
             self.c_local,
             text="Keamanan & Kerahasiaan Penuh: Video disimpan langsung ke Harddisk / NAS lokal tanpa koneksi internet.\n"
@@ -833,7 +833,7 @@ class SettingsDialog(tk.Toplevel):
 
         # 3. CARD YOUTUBE LIVE (Default Siskamling / Warga)
         self.c_youtube = tk.Frame(self.f_dynamic_server, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
-        tk.Label(self.c_youtube, text="🔑 YouTube Live Streaming (Free Cloud Storage)", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(self.c_youtube, text="YouTube Live Streaming (Free Cloud Storage)", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w")
         tk.Label(
             self.c_youtube,
             text="Gunakan Stream Key bawaan YouTube Studio Anda. Bebas biaya sewa server & penyimpanan gratis 24 jam.",
@@ -846,7 +846,7 @@ class SettingsDialog(tk.Toplevel):
         self.ent_stream_key = tk.Entry(f_sk, font=("Segoe UI", 9), width=36, show="*", bg="#0f172a", fg="#ffffff", insertbackground="#38bdf8")
         self.ent_stream_key.insert(0, stream_cfg.get("stream_key", ""))
         self.ent_stream_key.pack(side="left", padx=(0, 4))
-        self.btn_toggle_key = tk.Button(f_sk, text="👁️", bg="#334155", fg="#cbd5e1", relief="flat", font=("Segoe UI", 8), command=self.toggle_stream_key_visibility)
+        self.btn_toggle_key = tk.Button(f_sk, text="Lihat", bg="#334155", fg="#cbd5e1", relief="flat", font=("Segoe UI", 8), command=self.toggle_stream_key_visibility)
         self.btn_toggle_key.pack(side="left")
 
         f_rtmp = tk.Frame(self.c_youtube, bg="#1e293b")
@@ -892,7 +892,7 @@ class SettingsDialog(tk.Toplevel):
         self.cmb_playlist.bind("<<ComboboxSelected>>", self.on_playlist_selected)
 
         btn_fetch_pl = tk.Button(
-            f_pl_sel, text="🔄 Muat",
+            f_pl_sel, text="Muat",
             bg="#334155", fg="#38bdf8",
             activebackground="#475569", activeforeground="#ffffff",
             relief="flat", font=("Segoe UI", 7, "bold"),
@@ -902,7 +902,7 @@ class SettingsDialog(tk.Toplevel):
         btn_fetch_pl.pack(side="left", padx=(0, 4))
 
         btn_new_pl = tk.Button(
-            f_pl_sel, text="➕ Buat Baru",
+            f_pl_sel, text="Buat Baru",
             bg="#0284c7", fg="#ffffff",
             activebackground="#0369a1", activeforeground="#ffffff",
             relief="flat", font=("Segoe UI", 7, "bold"),
@@ -936,11 +936,11 @@ class SettingsDialog(tk.Toplevel):
 
         f_act = tk.Frame(f_api_box, bg="#0f172a")
         f_act.pack(fill="x", pady=(6, 0))
-        btn_t_api = tk.Button(f_act, text="▶ Tes YouTube API", bg="#dc2626", fg="white", relief="flat", font=("Segoe UI", 7, "bold"), padx=6, pady=2, command=self.test_youtube_api)
+        btn_t_api = tk.Button(f_act, text="Tes YouTube API", bg="#dc2626", fg="white", relief="flat", font=("Segoe UI", 7, "bold"), padx=6, pady=2, command=self.test_youtube_api)
         btn_t_api.pack(side="left", padx=(0, 6))
-        btn_c_live = tk.Button(f_act, text="⏹️ Tutup Siaran Zombie", bg="#b91c1c", fg="#fee2e2", relief="flat", font=("Segoe UI", 7), padx=6, pady=2, command=self.cleanup_active_broadcasts)
+        btn_c_live = tk.Button(f_act, text="Tutup Siaran Zombie", bg="#b91c1c", fg="#fee2e2", relief="flat", font=("Segoe UI", 7), padx=6, pady=2, command=self.cleanup_active_broadcasts)
         btn_c_live.pack(side="left", padx=(0, 6))
-        btn_c_up = tk.Button(f_act, text="🗑️ Hapus Upcoming Menumpuk", bg="#7f1d1d", fg="#fecaca", relief="flat", font=("Segoe UI", 7), padx=6, pady=2, command=self.cleanup_upcoming_broadcasts)
+        btn_c_up = tk.Button(f_act, text="Hapus Upcoming Menumpuk", bg="#7f1d1d", fg="#fecaca", relief="flat", font=("Segoe UI", 7), padx=6, pady=2, command=self.cleanup_upcoming_broadcasts)
         btn_c_up.pack(side="left")
 
         # Render kartu yang aktif
@@ -1039,7 +1039,7 @@ class SettingsDialog(tk.Toplevel):
                         if not silent:
                             messagebox.showinfo(
                                 "Daftar Playlist Dimuat",
-                                f"✔ Berhasil memuat {len(playlists)} playlist dari channel YouTube Anda!\n"
+                                f"Berhasil memuat {len(playlists)} playlist dari channel YouTube Anda!\n"
                                 f"Silakan pilih playlist yang diinginkan pada dropdown.",
                                 parent=self
                             )
@@ -1052,7 +1052,7 @@ class SettingsDialog(tk.Toplevel):
                             "Tidak dapat mengambil daftar playlist dari YouTube Studio.",
                             error_details=err,
                             action_url="https://studio.youtube.com",
-                            action_url_label="🌐 Buka YouTube Studio"
+                            action_url_label="Buka YouTube Studio"
                         ))
             except Exception as e:
                 if not silent:
@@ -1142,7 +1142,7 @@ class SettingsDialog(tk.Toplevel):
                     f"Terjadi kesalahan saat menghubungi server YouTube API:\n{e}",
                     error_details=err_text,
                     action_url="https://studio.youtube.com",
-                    action_url_label="🌐 Buka YouTube Studio"
+                    action_url_label="Buka YouTube Studio"
                 ))
 
         threading.Thread(target=run_test, daemon=True).start()
@@ -1182,7 +1182,7 @@ class SettingsDialog(tk.Toplevel):
                         msg,
                         error_details=err_log or msg,
                         action_url="https://studio.youtube.com",
-                        action_url_label="🌐 Buka YouTube Studio"
+                        action_url_label="Buka YouTube Studio"
                     ))
             except Exception as e:
                 import traceback
@@ -1193,7 +1193,7 @@ class SettingsDialog(tk.Toplevel):
                     f"Terjadi kegagalan saat proses pembersihan upcoming:\n{e}",
                     error_details=err_trace,
                     action_url="https://studio.youtube.com",
-                    action_url_label="🌐 Buka YouTube Studio"
+                    action_url_label="Buka YouTube Studio"
                 ))
 
         threading.Thread(target=run_cleanup, daemon=True).start()
@@ -1233,7 +1233,7 @@ class SettingsDialog(tk.Toplevel):
                         msg,
                         error_details=err_log or msg,
                         action_url="https://studio.youtube.com",
-                        action_url_label="🌐 Buka YouTube Studio"
+                        action_url_label="Buka YouTube Studio"
                     ))
             except Exception as e:
                 import traceback
@@ -1244,7 +1244,7 @@ class SettingsDialog(tk.Toplevel):
                     f"Terjadi kegagalan saat menutup siaran live menggantung:\n{e}",
                     error_details=err_trace,
                     action_url="https://studio.youtube.com",
-                    action_url_label="🌐 Buka YouTube Studio"
+                    action_url_label="Buka YouTube Studio"
                 ))
 
         threading.Thread(target=run_cleanup_live, daemon=True).start()
@@ -1255,7 +1255,7 @@ class SettingsDialog(tk.Toplevel):
         c_perf = tk.Frame(parent, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
         c_perf.pack(fill="x", pady=(0, 12))
 
-        tk.Label(c_perf, text="⚡ Mesin Encoding & Hardware Acceleration", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(c_perf, text="Mesin Encoding & Hardware Acceleration", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w")
 
         # Encoder
         f_enc = tk.Frame(c_perf, bg="#1e293b")
@@ -1314,7 +1314,7 @@ class SettingsDialog(tk.Toplevel):
         self.var_autostart = tk.BooleanVar(value=config_manager.is_autostart_enabled())
         chk_boot = tk.Checkbutton(
             c_boot,
-            text="🚀 Jalankan PosRonda Otomatis saat Windows Menyala (Auto-Recovery Pasca Mati Lampu)",
+            text="Jalankan PosRonda Otomatis saat Windows Menyala (Auto-Recovery Pasca Mati Lampu)",
             variable=self.var_autostart,
             bg="#1e293b", fg="#ffffff", selectcolor="#0f172a",
             activebackground="#1e293b", activeforeground="#ffffff",
@@ -1335,7 +1335,7 @@ class SettingsDialog(tk.Toplevel):
         c_osd = tk.Frame(parent, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
         c_osd.pack(fill="x")
 
-        tk.Label(c_osd, text="✍️ Kustomisasi Teks Jam & Nama Kamera (OSD)", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 10))
+        tk.Label(c_osd, text="Kustomisasi Teks Jam & Nama Kamera (OSD)", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 10))
 
         f_pos = tk.Frame(c_osd, bg="#1e293b")
         f_pos.pack(fill="x", pady=6)
@@ -1398,7 +1398,7 @@ class SettingsDialog(tk.Toplevel):
         self.ent_tg_chat.insert(0, tg_cfg.get("chat_id", ""))
         self.ent_tg_chat.pack(side="left", padx=5)
 
-        btn_t_tg = tk.Button(c_tg, text="✈ Kirim Notifikasi Tes Telegram", bg="#0284c7", fg="white", relief="flat", font=("Segoe UI", 9, "bold"), padx=10, pady=5, command=self.test_telegram)
+        btn_t_tg = tk.Button(c_tg, text="Kirim Notifikasi Tes Telegram", bg="#0284c7", fg="white", relief="flat", font=("Segoe UI", 9, "bold"), padx=10, pady=5, command=self.test_telegram)
         btn_t_tg.pack(anchor="w", pady=(12, 0))
 
     def test_telegram(self):
@@ -1411,7 +1411,7 @@ class SettingsDialog(tk.Toplevel):
         def _do_tg():
             try:
                 url = f"https://api.telegram.org/bot{token}/sendMessage"
-                r = requests.post(url, json={"chat_id": chat_id, "text": "🔔 Tes Berhasil! PosRonda Hub terhubung ke Telegram Anda."}, timeout=6)
+                r = requests.post(url, json={"chat_id": chat_id, "text": "Tes Berhasil! PosRonda Hub terhubung ke Telegram Anda."}, timeout=6)
                 if r.status_code == 200:
                     self.after(0, lambda: messagebox.showinfo("Sukses", "Pesan tes berhasil diterima Telegram!", parent=self))
                 else:
@@ -1429,7 +1429,7 @@ class SettingsDialog(tk.Toplevel):
 
         lbl_tier = tk.Label(
             c_status,
-            text=f"💎 {lic_info.get('tier_name')}",
+            text=f"{lic_info.get('tier_name')}",
             bg="#1e293b", fg="#38bdf8" if lic_info.get("is_pro") else "#cbd5e1",
             font=("Segoe UI", 11, "bold")
         )
@@ -1459,17 +1459,17 @@ class SettingsDialog(tk.Toplevel):
         tk.Label(
             c_info,
             text="Fitur Eksklusif PosRonda PRO:\n"
-                 "✔ Multi-Kamera hingga 16 Kamera (Grid 3x3 & Auto Patrol Tour).\n"
-                 "✔ Private Media Server (MediaMTX / SRS) & Direct Local NAS Recording.\n"
-                 "✔ White-Labeling Penuh: Ganti nama & logo PosRonda dengan merek usaha Anda sendiri.\n"
-                 "✔ Watermark Kustom & Logo Perusahaan pada tayangan siaran.",
+                 "- Multi-Kamera hingga 16 Kamera (Grid 3x3 & Auto Patrol Tour).\n"
+                 "- Private Media Server (MediaMTX / SRS) & Direct Local NAS Recording.\n"
+                 "- White-Labeling Penuh: Ganti nama & logo PosRonda dengan merek usaha Anda sendiri.\n"
+                 "- Watermark Kustom & Logo Perusahaan pada tayangan siaran.",
             bg="#1e293b", fg="#fbbf24", font=("Segoe UI", 8), justify="left"
         ).pack(anchor="w")
 
         c_act = tk.Frame(parent, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
         c_act.pack(fill="x")
 
-        tk.Label(c_act, text="🔑 Aktivasi Kunci Lisensi PosRonda PRO", bg="#1e293b", fg="#f8fafc", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 6))
+        tk.Label(c_act, text="Aktivasi Kunci Lisensi PosRonda PRO", bg="#1e293b", fg="#f8fafc", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 6))
 
         f_h = tk.Frame(c_act, bg="#1e293b")
         f_h.pack(fill="x", pady=2)
@@ -1493,13 +1493,13 @@ class SettingsDialog(tk.Toplevel):
         f_b_lic.pack(fill="x", pady=(8, 0))
 
         btn_apply_lic = tk.Button(
-            f_b_lic, text="✔ Pasang Lisensi PRO", bg="#059669", fg="white", relief="flat", font=("Segoe UI", 8, "bold"),
+            f_b_lic, text="Pasang Lisensi PRO", bg="#059669", fg="white", relief="flat", font=("Segoe UI", 8, "bold"),
             padx=10, pady=4, cursor="hand2", command=self.apply_pro_license
         )
         btn_apply_lic.pack(side="left", padx=(0, 8))
 
         btn_buy_lic = tk.Button(
-            f_b_lic, text="🛒 Beli Lisensi Pro PosRonda", bg="#3b82f6", fg="white", relief="flat", font=("Segoe UI", 8),
+            f_b_lic, text="Beli Lisensi Pro PosRonda", bg="#3b82f6", fg="white", relief="flat", font=("Segoe UI", 8),
             padx=10, pady=4, cursor="hand2", command=self.open_buy_license_info
         )
         btn_buy_lic.pack(side="left")

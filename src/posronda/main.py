@@ -55,7 +55,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.1.0"
+    __version__ = "4.4.0"
 
 class CCTVApp:
     def __init__(self, root):
@@ -107,7 +107,7 @@ class CCTVApp:
         # Kiri: Brand Pill, Live Indicator Pill, Spec Badge & Teks Status
         self.lbl_brand_badge = tk.Label(
             self.bottom_bar, 
-            text=f"🛡️ PosRonda v{__version__}", 
+            text=f"PosRonda v{__version__}", 
             bg="#1e1b4b", 
             fg="#818cf8", 
             font=("Segoe UI", 9, "bold"),
@@ -117,7 +117,7 @@ class CCTVApp:
 
         self.lbl_status_icon = tk.Label(
             self.bottom_bar, 
-            text="● MONITORING", 
+            text="MONITORING", 
             bg="#064e3b", 
             fg="#34d399", 
             font=("Segoe UI", 8, "bold"),
@@ -152,7 +152,7 @@ class CCTVApp:
         # Kanan: Tombol Kendali Cepat (Fullscreen, Lisensi, Settings, Navigasi Halaman, Akhiri, Restart, Jeda)
         self.btn_fs = tk.Button(
             self.bottom_bar, 
-            text="⛶ Fullscreen (F11)", 
+            text="Fullscreen (F11)", 
             bg="#1e293b", 
             fg="#94a3b8", 
             activebackground="#334155", 
@@ -167,7 +167,7 @@ class CCTVApp:
 
         self.btn_about = tk.Button(
             self.bottom_bar, 
-            text="💎 Lisensi (F1)", 
+            text="Lisensi (F1)", 
             bg="#1e293b", 
             fg="#38bdf8", 
             activebackground="#0284c7", 
@@ -182,7 +182,7 @@ class CCTVApp:
 
         self.btn_settings = tk.Button(
             self.bottom_bar, 
-            text="⚙️ Pengaturan (F2)", 
+            text="Pengaturan (F2)", 
             bg="#334155", 
             fg="#e2e8f0", 
             activebackground="#475569", 
@@ -199,7 +199,7 @@ class CCTVApp:
         self.is_eco_mode = False
         self.btn_eco = tk.Button(
             self.bottom_bar,
-            text="⚡ Mode Hemat (F9)",
+            text="Mode Hemat (F9)",
             bg="#334155",
             fg="#cbd5e1",
             activebackground="#475569",
@@ -215,7 +215,7 @@ class CCTVApp:
         # Tombol Navigasi Halaman Kamera (Patrol / Tour Mode Quick Selector)
         self.btn_page = tk.Button(
             self.bottom_bar,
-            text="📄 Hal 1/1 (Spasi)",
+            text="Hal 1/1 (Spasi)",
             bg="#1e1b4b",
             fg="#a5b4fc",
             activebackground="#312e81",
@@ -230,7 +230,7 @@ class CCTVApp:
 
         self.btn_end = tk.Button(
             self.bottom_bar, 
-            text="⏹️ Akhiri (F7)", 
+            text="Akhiri (F7)", 
             bg="#b91c1c", 
             fg="white", 
             activebackground="#dc2626", 
@@ -245,7 +245,7 @@ class CCTVApp:
 
         self.btn_restart = tk.Button(
             self.bottom_bar, 
-            text="🔄 Restart (F5)", 
+            text="Restart (F5)", 
             bg="#1d4ed8", 
             fg="white", 
             activebackground="#2563eb", 
@@ -260,7 +260,7 @@ class CCTVApp:
 
         self.btn_pause = tk.Button(
             self.bottom_bar, 
-            text="⏸️ Jeda (F6)", 
+            text="Jeda (F6)", 
             bg="#b45309", 
             fg="white", 
             activebackground="#d97706", 
@@ -415,11 +415,11 @@ class CCTVApp:
             if total > 1:
                 patrol_tag = " [Auto]" if patrol_on else ""
                 self.btn_page.config(
-                    text=f"📄 Hal {cur+1}/{total}{patrol_tag} (Spasi)",
+                    text=f"Hal {cur+1}/{total}{patrol_tag} (Spasi)",
                     state="normal"
                 )
             else:
-                self.btn_page.config(text="📄 Hal 1/1", state="disabled")
+                self.btn_page.config(text="Hal 1/1", state="disabled")
 
     def _youtube_lifecycle_loop(self):
         """
@@ -474,7 +474,7 @@ class CCTVApp:
                 started = self.pusher.start()
                 if not started or not self.pusher.running:
                     self.is_streaming = False
-                    self.lbl_status_icon.config(text="⚠️ ENCODER ERROR", bg="#450a0a", fg="#ef4444")
+                    self.lbl_status_icon.config(text="[ERROR] ENCODER", bg="#450a0a", fg="#ef4444")
                     self.lbl_status_text.config(text="FFmpeg perekaman lokal gagal berjalan! Periksa ffmpeg_log.txt.")
                     self.stream_trigger.clear()
                     self.stream_trigger.wait(timeout=5)
@@ -485,7 +485,7 @@ class CCTVApp:
                 self.stream_start_time = time.time()
                 start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time))
                 self.is_streaming = True
-                self.update_status(f"💾 Perekaman Lokal Aktif ({actual_encoder}) -> {rec_dir}/ ({seg_mins}m per part | Auto-Delete {ret_days} hari | Mulai {start_clock} WIB)", is_live=True)
+                self.update_status(f"Perekaman Lokal Aktif ({actual_encoder}) -> {rec_dir}/ ({seg_mins}m per part | Auto-Delete {ret_days} hari | Mulai {start_clock} WIB)", is_live=True)
                 wait_seconds = 86400
 
             # ----------------------------------------------------
@@ -494,7 +494,7 @@ class CCTVApp:
             elif stream_mode == "private_rtmp":
                 custom_url = stream_cfg.get("custom_rtmp_url", "").strip()
                 if not custom_url:
-                    self.lbl_status_icon.config(text="⚠️ RTMP KOSONG", bg="#450a0a", fg="#ef4444")
+                    self.lbl_status_icon.config(text="[ERROR] RTMP KOSONG", bg="#450a0a", fg="#ef4444")
                     self.lbl_status_text.config(text="Target RTMP Server kosong! Buka [F2] lalu tentukan URL RTMP tujuan.")
                     self.stream_trigger.clear()
                     self.stream_trigger.wait(timeout=5)
@@ -523,7 +523,7 @@ class CCTVApp:
                 started = self.pusher.start()
                 if not started or not self.pusher.running:
                     self.is_streaming = False
-                    self.lbl_status_icon.config(text="⚠️ ENCODER ERROR", bg="#450a0a", fg="#ef4444")
+                    self.lbl_status_icon.config(text="[ERROR] ENCODER", bg="#450a0a", fg="#ef4444")
                     self.lbl_status_text.config(text="FFmpeg streaming private gagal! Periksa ffmpeg_log.txt.")
                     self.stream_trigger.clear()
                     self.stream_trigger.wait(timeout=5)
@@ -534,7 +534,7 @@ class CCTVApp:
                 self.stream_start_time = time.time()
                 start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time))
                 self.is_streaming = True
-                self.update_status(f"🏢 Private Server Live ({actual_encoder}) -> {custom_url} (Mulai {start_clock} WIB)", is_live=True)
+                self.update_status(f"Private Server Live ({actual_encoder}) -> {custom_url} (Mulai {start_clock} WIB)", is_live=True)
                 wait_seconds = 86400
 
             # ----------------------------------------------------
@@ -611,7 +611,7 @@ class CCTVApp:
 
                     if not started or not self.pusher.running:
                         self.is_streaming = False
-                        self.lbl_status_icon.config(text="⚠️ ENCODER ERROR", bg="#450a0a", fg="#ef4444")
+                        self.lbl_status_icon.config(text="[ERROR] ENCODER", bg="#450a0a", fg="#ef4444")
                         self.lbl_status_text.config(text="FFmpeg gagal berjalan! Periksa ffmpeg_log.txt.")
                         self.stream_trigger.clear()
                         self.stream_trigger.wait(timeout=5)
@@ -627,7 +627,7 @@ class CCTVApp:
                         self.update_status(f"Streaming Manual ({actual_encoder} @ {fps}fps) -> YouTube (Mulai {start_clock} WIB)", is_live=True)
                     else:
                         self.is_streaming = False
-                        self.lbl_status_icon.config(text=f"🟡 CONNECTING (Mulai {start_clock})", bg="#451a03", fg="#f59e0b")
+                        self.lbl_status_icon.config(text=f"CONNECTING ({start_clock})", bg="#451a03", fg="#f59e0b")
                         self.lbl_status_text.config(text=f"Mengalirkan video ({actual_encoder}) ke YouTube, memverifikasi siaran...")
 
                     if self.youtube_mgr and self.current_broadcast:
@@ -662,13 +662,13 @@ class CCTVApp:
                     if self.streaming_enabled:
                         if api_error:
                             if "403" in api_error or "exceed" in api_error.lower() or "quota" in api_error.lower():
-                                self.lbl_status_icon.config(text="⚠️ KUOTA API HABIS (403)", bg="#451a03", fg="#f59e0b")
+                                self.lbl_status_icon.config(text="[403] KUOTA API HABIS", bg="#451a03", fg="#f59e0b")
                                 self.lbl_status_text.config(text="Kuota harian YouTube API habis (Error 403). Buka [F2] lalu tempel Stream Key dari YouTube Studio agar langsung LIVE tanpa kuota!")
                             else:
-                                self.lbl_status_icon.config(text="⚠️ YOUTUBE API ERROR", bg="#450a0a", fg="#ef4444")
+                                self.lbl_status_icon.config(text="[ERROR] YOUTUBE API", bg="#450a0a", fg="#ef4444")
                                 self.lbl_status_text.config(text=f"Gagal buat siaran: {api_error}. Buka [F2] untuk Stream Key manual.")
                         else:
-                            self.lbl_status_icon.config(text="⚠️ STREAM KEY KOSONG", bg="#450a0a", fg="#ef4444")
+                            self.lbl_status_icon.config(text="[ERROR] STREAM KEY KOSONG", bg="#450a0a", fg="#ef4444")
                             self.lbl_status_text.config(text="Stream Key kosong! Tekan [F2] untuk mengisi Stream Key YouTube Anda.")
                     wait_seconds = 5
 
@@ -717,18 +717,18 @@ class CCTVApp:
 
         if self.is_paused:
             if stream_mode == "local_recording":
-                self.update_status("⏸️ Perekaman lokal DIJEDA (Kamera lokal tetap dipantau)")
+                self.update_status("Perekaman lokal DIJEDA (Kamera lokal tetap dipantau)")
             elif stream_mode == "private_rtmp":
-                self.update_status("⏸️ Streaming ke Private Server DIJEDA (Layar standby aktif)")
+                self.update_status("Streaming ke Private Server DIJEDA (Layar standby aktif)")
             else:
-                self.update_status("⏸️ Streaming DIJEDA ke YouTube (Layar standby aktif | Kamera lokal normal)")
+                self.update_status("Streaming DIJEDA ke YouTube (Layar standby aktif | Kamera lokal normal)")
         else:
             if stream_mode == "local_recording":
-                self.update_status("▶️ Perekaman lokal DILANJUTKAN")
+                self.update_status("Perekaman lokal DILANJUTKAN")
             elif stream_mode == "private_rtmp":
-                self.update_status("▶️ Streaming DILANJUTKAN ke Private Server")
+                self.update_status("Streaming DILANJUTKAN ke Private Server")
             else:
-                self.update_status("▶️ Streaming DILANJUTKAN ke YouTube")
+                self.update_status("Streaming DILANJUTKAN ke YouTube")
 
     def end_streaming(self):
         """Mengakhiri siaran streaming / rekaman atau memulai dari kondisi offline (F7)"""
@@ -857,7 +857,7 @@ class CCTVApp:
         if cam:
             print(f"[UI] Double-tap terdeteksi pada {cam.name}. Memulai reconnect...")
             cam.refresh()
-            self.lbl_status_text.config(text=f"🔄 Merefresh & menghubungkan ulang {cam.name}...")
+            self.lbl_status_text.config(text=f"Merefresh & menghubungkan ulang {cam.name}...")
 
     def on_canvas_single_tap(self, event):
         """Jika kamera sedang OFFLINE / Gagal Konek / Putus, sekali klik langsung memicu refresh"""
@@ -865,19 +865,19 @@ class CCTVApp:
         if cam and cam.status != "ONLINE":
             print(f"[UI] Tap terdeteksi pada {cam.name} ({cam.status}). Memulai reconnect...")
             cam.refresh()
-            self.lbl_status_text.config(text=f"🔄 Menghubungkan ulang {cam.name}...")
+            self.lbl_status_text.config(text=f"Menghubungkan ulang {cam.name}...")
 
     def on_canvas_right_click(self, event):
         """Menu klik-kanan cepat untuk kendali kamera individual"""
         cam_idx, cam = self._get_camera_at_pos(event.x, event.y)
         menu = tk.Menu(self.root, tearoff=0, bg="#1e293b", fg="#e2e8f0", activebackground="#3b82f6", activeforeground="#ffffff")
         if cam:
-            menu.add_command(label=f"🔄 Refresh {cam.name} (Tap 2x)", command=lambda: self._refresh_single_camera(cam))
+            menu.add_command(label=f"Refresh {cam.name} (Tap 2x)", command=lambda: self._refresh_single_camera(cam))
             menu.add_separator()
-        menu.add_command(label=f"🔄 Refresh Seluruh Kamera ({len(self.cams)})", command=self.refresh_all_cameras)
-        menu.add_command(label="📄 Ganti Halaman Kamera (Spasi)", command=self.switch_camera_page)
+        menu.add_command(label=f"Refresh Seluruh Kamera ({len(self.cams)})", command=self.refresh_all_cameras)
+        menu.add_command(label="Ganti Halaman Kamera (Spasi)", command=self.switch_camera_page)
         menu.add_separator()
-        menu.add_command(label="⚙️ Buka Pengaturan CCTV (F2)", command=self.open_settings)
+        menu.add_command(label="Pengaturan CCTV (F2)", command=self.open_settings)
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -885,12 +885,12 @@ class CCTVApp:
 
     def _refresh_single_camera(self, cam):
         cam.refresh()
-        self.lbl_status_text.config(text=f"🔄 Merefresh & menghubungkan ulang {cam.name}...")
+        self.lbl_status_text.config(text=f"Merefresh & menghubungkan ulang {cam.name}...")
 
     def refresh_all_cameras(self):
         for c in self.cams:
             c.refresh()
-        self.lbl_status_text.config(text=f"🔄 Merefresh seluruh {len(self.cams)} feed kamera...")
+        self.lbl_status_text.config(text=f"Merefresh seluruh {len(self.cams)} feed kamera...")
 
     def toggle_eco_mode(self):
         """
@@ -901,13 +901,13 @@ class CCTVApp:
         """
         self.is_eco_mode = not self.is_eco_mode
         if self.is_eco_mode:
-            self.btn_eco.config(text="🖥️ Mode Studio (F9)", bg="#0284c7", fg="#ffffff")
-            self.update_status("⚡ Mode Hemat Aktif (GUI 1 FPS) • Output Streamer Tetap Berjalan Penuh di Latar Belakang")
+            self.btn_eco.config(text="Mode Studio (F9)", bg="#0284c7", fg="#ffffff")
+            self.update_status("Mode Hemat Aktif (GUI 1 FPS) • Output Streamer Tetap Berjalan Penuh di Latar Belakang")
         else:
-            self.btn_eco.config(text="⚡ Mode Hemat (F9)", bg="#334155", fg="#cbd5e1")
+            self.btn_eco.config(text="Mode Hemat (F9)", bg="#334155", fg="#cbd5e1")
             fps = self.cfg.get("streaming", {}).get("fps", 25)
             self.render_interval_ms = max(int(1000 / fps), 25)
-            self.update_status("🖥️ Mode Studio Aktif (Tampilan Layar Monitor Framerate Penuh)")
+            self.update_status("Mode Studio Aktif (Tampilan Layar Monitor Framerate Penuh)")
 
     def update_frame_loop(self):
         try:
@@ -969,20 +969,20 @@ class CCTVApp:
             stream_mode = self.cfg.get("streaming", {}).get("mode", "youtube")
 
             if not self.streaming_enabled:
-                self.lbl_status_icon.config(text="⚪ OFFLINE", bg="#1e293b", fg="#94a3b8")
-                start_btn_text = "💾 Mulai Rekam (F7)" if stream_mode == "local_recording" else "▶️ Mulai Stream (F7)"
+                self.lbl_status_icon.config(text="OFFLINE", bg="#1e293b", fg="#94a3b8")
+                start_btn_text = "Mulai Rekam (F7)" if stream_mode == "local_recording" else "Mulai Stream (F7)"
                 self.btn_end.config(text=start_btn_text, bg="#15803d", activebackground="#16a34a")
-                self.btn_pause.config(state="disabled", text="⏸️ Jeda (F6)", bg="#334155")
+                self.btn_pause.config(state="disabled", text="Jeda (F6)", bg="#334155")
             elif self.is_paused:
-                self.lbl_status_icon.config(text="⏸️ DIJEDA", bg="#451a03", fg="#fbbf24")
-                self.btn_end.config(text="⏹️ Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
-                self.btn_pause.config(state="normal", text="▶️ Lanjutkan (F6)", bg="#15803d", activebackground="#16a34a")
+                self.lbl_status_icon.config(text="DIJEDA", bg="#451a03", fg="#fbbf24")
+                self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
+                self.btn_pause.config(state="normal", text="Lanjutkan (F6)", bg="#15803d", activebackground="#16a34a")
             elif self.pusher and self.pusher.running:
                 # Cek jika proses FFmpeg crash / tertutup
                 if self.pusher.process and self.pusher.process.poll() is not None:
                     exit_code = self.pusher.process.poll()
                     self.is_streaming = False
-                    self.lbl_status_icon.config(text="⚠️ ENCODER ERROR", bg="#450a0a", fg="#ef4444")
+                    self.lbl_status_icon.config(text="[ERROR] ENCODER", bg="#450a0a", fg="#ef4444")
                     self.lbl_status_text.config(text=f"FFmpeg tertutup (Kode: {exit_code})! Periksa ffmpeg_log.txt.")
                 else:
                     # Auto-promote ke LIVE jika FFmpeg sudah aktif mengalir stabil > 3 detik
@@ -991,10 +991,10 @@ class CCTVApp:
                         start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
                         if stream_mode == "local_recording":
                             rec_dir = self.cfg.get("streaming", {}).get("local_record", {}).get("output_dir", "recordings")
-                            self.lbl_status_text.config(text=f"💾 PEREKAMAN AKTIF: Menyimpan video lokal ke {rec_dir}/ (Mulai {start_clock} WIB)")
+                            self.lbl_status_text.config(text=f"PEREKAMAN AKTIF: Menyimpan video lokal ke {rec_dir}/ (Mulai {start_clock} WIB)")
                         elif stream_mode == "private_rtmp":
                             target_url = self.cfg.get("streaming", {}).get("custom_rtmp_url", "Private Server")
-                            self.lbl_status_text.config(text=f"🏢 PRIVATE LIVE: Mengalir ke {target_url} (Mulai {start_clock} WIB)")
+                            self.lbl_status_text.config(text=f"PRIVATE LIVE: Mengalir ke {target_url} (Mulai {start_clock} WIB)")
                         else:
                             title = self.current_broadcast.get('title', 'PosRonda Live') if self.current_broadcast else "Streaming PosRonda"
                             self.lbl_status_text.config(text=f"RESMI LIVE: {title} (Tayang sejak {start_clock} WIB)")
@@ -1007,28 +1007,28 @@ class CCTVApp:
 
                         if stream_mode == "local_recording":
                             self.lbl_status_icon.config(
-                                text=f"💾 REKAM ({hh:02d}:{mm:02d}:{ss:02d})", 
+                                text=f"REKAM ({hh:02d}:{mm:02d}:{ss:02d})", 
                                 bg="#064e3b",
                                 fg="#34d399"
                             )
                         elif stream_mode == "private_rtmp":
                             self.lbl_status_icon.config(
-                                text=f"🏢 PRIVATE ({hh:02d}:{mm:02d}:{ss:02d})", 
+                                text=f"PRIVATE ({hh:02d}:{mm:02d}:{ss:02d})", 
                                 bg="#312e81",
                                 fg="#a5b4fc"
                             )
                         else:
                             self.lbl_status_icon.config(
-                                text=f"● LIVE ({hh:02d}:{mm:02d}:{ss:02d})", 
+                                text=f"LIVE ({hh:02d}:{mm:02d}:{ss:02d})", 
                                 bg="#450a0a",
                                 fg="#ef4444"
                             )
-                        self.btn_end.config(text="⏹️ Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
-                        self.btn_pause.config(state="normal", text="⏸️ Jeda (F6)", bg="#b45309", activebackground="#d97706")
+                        self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
+                        self.btn_pause.config(state="normal", text="Jeda (F6)", bg="#b45309", activebackground="#d97706")
                     else:
-                        self.lbl_status_icon.config(text=f"🟡 CONNECTING", bg="#451a03", fg="#f59e0b")
-                        self.btn_end.config(text="⏹️ Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
-                        self.btn_pause.config(state="disabled", text="⏸️ Jeda (F6)", bg="#334155")
+                        self.lbl_status_icon.config(text="CONNECTING", bg="#451a03", fg="#f59e0b")
+                        self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
+                        self.btn_pause.config(state="disabled", text="Jeda (F6)", bg="#334155")
         except Exception:
             pass
 
@@ -1041,18 +1041,18 @@ class CCTVApp:
         stream_mode = self.cfg.get("streaming", {}).get("mode", "youtube")
 
         if not self.streaming_enabled:
-            self.lbl_status_icon.config(text="⚪ OFFLINE", bg="#1e293b", fg="#94a3b8")
-            start_btn_text = "💾 Mulai Rekam (F7)" if stream_mode == "local_recording" else "▶️ Mulai Stream (F7)"
+            self.lbl_status_icon.config(text="OFFLINE", bg="#1e293b", fg="#94a3b8")
+            start_btn_text = "Mulai Rekam (F7)" if stream_mode == "local_recording" else "Mulai Stream (F7)"
             self.btn_end.config(text=start_btn_text, bg="#15803d", activebackground="#16a34a")
-            self.btn_pause.config(state="disabled", text="⏸️ Jeda (F6)", bg="#334155")
+            self.btn_pause.config(state="disabled", text="Jeda (F6)", bg="#334155")
         elif not self.is_streaming:
-            self.lbl_status_icon.config(text=f"🟡 CONNECTING", bg="#451a03", fg="#f59e0b")
-            self.btn_end.config(text="⏹️ Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
-            self.btn_pause.config(state="disabled", text="⏸️ Jeda (F6)", bg="#334155")
+            self.lbl_status_icon.config(text="CONNECTING", bg="#451a03", fg="#f59e0b")
+            self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
+            self.btn_pause.config(state="disabled", text="Jeda (F6)", bg="#334155")
         elif self.is_paused:
-            self.lbl_status_icon.config(text="⏸️ DIJEDA", bg="#451a03", fg="#fbbf24")
-            self.btn_end.config(text="⏹️ Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
-            self.btn_pause.config(state="normal", text="▶️ Lanjutkan (F6)", bg="#15803d", activebackground="#16a34a")
+            self.lbl_status_icon.config(text="DIJEDA", bg="#451a03", fg="#fbbf24")
+            self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
+            self.btn_pause.config(state="normal", text="Lanjutkan (F6)", bg="#15803d", activebackground="#16a34a")
         else:
             elapsed_sec = int(time.time() - (self.stream_start_time or time.time()))
             hh = elapsed_sec // 3600
@@ -1060,24 +1060,24 @@ class CCTVApp:
             ss = elapsed_sec % 60
             if stream_mode == "local_recording":
                 self.lbl_status_icon.config(
-                    text=f"💾 REKAM ({hh:02d}:{mm:02d}:{ss:02d})", 
+                    text=f"REKAM ({hh:02d}:{mm:02d}:{ss:02d})", 
                     bg="#064e3b",
                     fg="#34d399"
                 )
             elif stream_mode == "private_rtmp":
                 self.lbl_status_icon.config(
-                    text=f"🏢 PRIVATE ({hh:02d}:{mm:02d}:{ss:02d})", 
+                    text=f"PRIVATE ({hh:02d}:{mm:02d}:{ss:02d})", 
                     bg="#312e81",
                     fg="#a5b4fc"
                 )
             else:
                 self.lbl_status_icon.config(
-                    text=f"● LIVE ({hh:02d}:{mm:02d}:{ss:02d})", 
+                    text=f"LIVE ({hh:02d}:{mm:02d}:{ss:02d})", 
                     bg="#450a0a",
                     fg="#ef4444"
                 )
-            self.btn_end.config(text="⏹️ Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
-            self.btn_pause.config(state="normal", text="⏸️ Jeda (F6)", bg="#b45309", activebackground="#d97706")
+            self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
+            self.btn_pause.config(state="normal", text="Jeda (F6)", bg="#b45309", activebackground="#d97706")
 
         self.lbl_status_text.config(text=text)
 
@@ -1167,7 +1167,7 @@ class CCTVApp:
             gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to=ngulonstudio@gmail.com&su={subject}&body={body}"
             fallback_url = "https://ngulonstudio.web.id"
 
-            status_lbl.config(text="✓ Alamat ngulonstudio@gmail.com disalin ke clipboard. Membuka browser...")
+            status_lbl.config(text="Alamat ngulonstudio@gmail.com disalin ke clipboard. Membuka browser...")
             try:
                 opened = webbrowser.open_new(gmail_url)
                 if not opened:
