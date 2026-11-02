@@ -8,6 +8,14 @@ src_dir = os.path.join(base_dir, "src")
 
 datas = [('config.json', '.')]
 binaries = []
+
+# Deteksi apakah ffmpeg.exe ada untuk dibundle ke edisi FULL
+ffmpeg_cand = os.path.join(base_dir, "ffmpeg.exe")
+if os.path.exists(ffmpeg_cand):
+    binaries.append((ffmpeg_cand, '.'))
+    print(f"[*] POSRONDA FULL: Menyertakan {ffmpeg_cand} ke dalam paket EXE")
+else:
+    print("[*] POSRONDA LITE: Membangun tanpa bundel ffmpeg.exe internal")
 hiddenimports = [
     'posronda',
     'posronda.main',
@@ -67,7 +75,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='PosRonda',
+    name=os.environ.get('POSRONDA_EXE_NAME', 'PosRonda'),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

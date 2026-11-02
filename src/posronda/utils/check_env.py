@@ -22,6 +22,8 @@ FFMPEG_DOWNLOAD_URL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essenti
 FFMPEG_DOWNLOAD_NAME = "FFmpeg Release Essentials (Windows 64-bit with Intel QuickSync)"
 
 def check_python_version():
+    if getattr(sys, 'frozen', False):
+        return True, "Python 3.11 terintegrasi (Bundled EXE)"
     major = sys.version_info.major
     minor = sys.version_info.minor
     if major == REQUIRED_PYTHON_MAJOR and minor >= REQUIRED_PYTHON_MINOR:
@@ -29,29 +31,34 @@ def check_python_version():
     return False, f"Python {major}.{minor}.{sys.version_info.micro} (Disarankan minimal 3.10)"
 
 def check_ffmpeg():
-    # 1. Cek di PATH sistem
-    if shutil.which("ffmpeg") or shutil.which("ffmpeg.exe"):
-        return True, "FFmpeg terdeteksi di System PATH"
-    
-    # 2. Cek di folder lokal aplikasi
+    # 0. Cek jika terbundle di dalam PyInstaller (sys._MEIPASS - Versi Full)
+    if hasattr(sys, "_MEIPASS") and os.path.exists(os.path.join(sys._MEIPASS, "ffmpeg.exe")):
+        return True, "FFmpeg terintegrasi di dalam aplikasi (Bundled Full Edition)"
+
+    # 1. Cek di folder lokal tempat PosRonda berada
     this_dir = os.path.dirname(os.path.abspath(__file__))
     root_candidate = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
     local_paths = [
+        os.path.join(exe_dir, "ffmpeg.exe"),
+        os.path.join(exe_dir, "ffmpeg", "bin", "ffmpeg.exe"),
+        os.path.join(exe_dir, "bin", "ffmpeg.exe"),
         os.path.join(os.getcwd(), "ffmpeg.exe"),
         os.path.join(os.getcwd(), "ffmpeg", "bin", "ffmpeg.exe"),
         os.path.join(os.getcwd(), "bin", "ffmpeg.exe"),
         os.path.join(root_candidate, "ffmpeg.exe"),
         os.path.join(root_candidate, "ffmpeg", "bin", "ffmpeg.exe"),
         os.path.join(root_candidate, "bin", "ffmpeg.exe"),
-        os.path.join(os.path.dirname(sys.executable), "ffmpeg.exe"),
-        os.path.join(os.path.dirname(sys.executable), "ffmpeg", "bin", "ffmpeg.exe"),
-        os.path.join(os.path.dirname(sys.executable), "bin", "ffmpeg.exe"),
         os.path.join(this_dir, "ffmpeg.exe"),
     ]
     for p in local_paths:
         if os.path.exists(p):
-            return True, f"FFmpeg ditemukan di folder lokal: {p}"
-            
+            return True, f"FFmpeg ditemukan di folder aplikasi: {p}"
+
+    # 2. Cek di PATH sistem laptop
+    if shutil.which("ffmpeg") or shutil.which("ffmpeg.exe"):
+        return True, "FFmpeg terdeteksi di System PATH laptop"
+
     return False, "FFmpeg TIDAK ditemukan di komputer"
 
 def open_url(url):
@@ -60,7 +67,7 @@ def open_url(url):
 def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
     root = tk.Tk()
     root.title("Pemeriksa Sistem - PosRonda v4.0")
-    root.geometry("620x460")
+    root.geometry("660x510")
     root.resizable(False, False)
     root.configure(bg="#0b0f19")
 
@@ -129,7 +136,39 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
             padx=8, pady=4,
             command=lambda: open_url(FFMPEG_DOWNLOAD_URL)
         )
-        btn_ff.grid(row=4, column=1, sticky="w", padx=10, pady=5)
+        btn_ff.grid(row=4, column=1, sticky="w", padx=10, pady=(5, 3))
+
+        def pick_local_ffmpeg():
+            from tkinter import filedialog, messagebox
+            picked = filedialog.askopenfilename(
+                title="Pilih file ffmpeg.exe di komputer Anda",
+                filetypes=[("FFmpeg Executable", "*.exe"), ("All Files", "*.*")]
+            )
+            if picked and os.path.exists(picked):
+                target_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.getcwd()
+                target_file = os.path.join(target_dir, "ffmpeg.exe")
+                try:
+                    shutil.copy2(picked, target_file)
+                    messagebox.showinfo(
+                        "Berhasil", 
+                        f"File ffmpeg.exe berhasil disalin permanen ke folder aplikasi:\n{target_file}\n\nSilakan klik 'Mulai Aplikasi'.",
+                        parent=root
+                    )
+                    root.destroy()
+                except Exception as err:
+                    messagebox.showerror("Gagal Menyalin", f"Gagal menyalin file: {err}", parent=root)
+
+        btn_browse = tk.Button(
+            frame,
+            text="📁 Pilih File ffmpeg.exe dari Laptop (Disalin Otomatis)",
+            bg="#0284c7",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            relief="flat",
+            padx=8, pady=4,
+            command=pick_local_ffmpeg
+        )
+        btn_browse.grid(row=5, column=1, sticky="w", padx=10, pady=(3, 5))
 
     # Panduan singkat
     footer_text = (

@@ -481,19 +481,29 @@ class FFmpegStreamPusher:
             target = f"{self.rtmp_url.rstrip('/')}/{self.stream_key}"
 
         # Prioritas pemilihan binary FFmpeg:
+        # 0. Internal bundle jika dibundle PyInstaller (sys._MEIPASS)
         # 1. Folder lokal PosRonda (ffmpeg.exe atau ffmpeg/bin/ffmpeg.exe)
         # 2. System PATH di komputer / laptop user (shutil.which)
         # 3. Default fallback "ffmpeg"
-        ffmpeg_bin = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe") or "ffmpeg"
-        local_candidates = [
-            os.path.join(base_dir, "ffmpeg.exe"),
-            os.path.join(base_dir, "ffmpeg", "bin", "ffmpeg.exe"),
-            os.path.join(base_dir, "bin", "ffmpeg.exe"),
-        ]
-        for cand in local_candidates:
-            if os.path.exists(cand):
-                ffmpeg_bin = cand
-                break
+        ffmpeg_bin = None
+        if hasattr(sys, "_MEIPASS"):
+            meipass_ff = os.path.join(sys._MEIPASS, "ffmpeg.exe")
+            if os.path.exists(meipass_ff):
+                ffmpeg_bin = meipass_ff
+
+        if not ffmpeg_bin:
+            local_candidates = [
+                os.path.join(base_dir, "ffmpeg.exe"),
+                os.path.join(base_dir, "ffmpeg", "bin", "ffmpeg.exe"),
+                os.path.join(base_dir, "bin", "ffmpeg.exe"),
+            ]
+            for cand in local_candidates:
+                if os.path.exists(cand):
+                    ffmpeg_bin = cand
+                    break
+
+        if not ffmpeg_bin:
+            ffmpeg_bin = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe") or "ffmpeg"
 
         log_file_path = os.path.join(base_dir, "ffmpeg_log.txt")
 
