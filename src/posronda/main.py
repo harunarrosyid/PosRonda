@@ -185,6 +185,23 @@ class CCTVApp:
         )
         self.btn_settings.pack(side="right", padx=2)
 
+        # Mode Hemat / Mode Studio (F9) Toggle
+        self.is_eco_mode = False
+        self.btn_eco = tk.Button(
+            self.bottom_bar,
+            text="⚡ Mode Hemat (F9)",
+            bg="#334155",
+            fg="#cbd5e1",
+            activebackground="#475569",
+            activeforeground="#ffffff",
+            relief="flat",
+            font=("Segoe UI", 8),
+            padx=7, pady=2,
+            cursor="hand2",
+            command=self.toggle_eco_mode
+        )
+        self.btn_eco.pack(side="right", padx=2)
+
         # Tombol Navigasi Halaman Kamera (Patrol / Tour Mode Quick Selector)
         self.btn_page = tk.Button(
             self.bottom_bar,
@@ -267,6 +284,8 @@ class CCTVApp:
         self.root.bind("<F5>", lambda e: self.restart_streaming())
         self.root.bind("<F6>", lambda e: self.toggle_pause())
         self.root.bind("<F7>", lambda e: self.end_streaming())
+        self.root.bind("<F9>", lambda e: self.toggle_eco_mode())
+        self.root.bind("<f9>", lambda e: self.toggle_eco_mode())
 
         # Shortcut Patrol / Ganti Halaman Kamera
         self.root.bind("<space>", lambda e: self.switch_camera_page())
@@ -864,11 +883,42 @@ class CCTVApp:
             c.refresh()
         self.lbl_status_text.config(text=f"🔄 Merefresh seluruh {len(self.cams)} feed kamera...")
 
+    def toggle_eco_mode(self):
+        """
+        Beralih antara:
+        1. Mode Studio (Tampilan Penuh 25fps + Layout Perancangan)
+        2. Mode Hemat / Monitor (Render GUI diturunkan ke 1 FPS untuk menghemat CPU & daya 24/7,
+           sementara streaming FFmpeg ke YouTube/RTMP/HDD tetap berjalan 100% penuh 25fps di latar belakang).
+        """
+        self.is_eco_mode = not self.is_eco_mode
+        if self.is_eco_mode:
+            self.btn_eco.config(text="🖥️ Mode Studio (F9)", bg="#0284c7", fg="#ffffff")
+            self.update_status("⚡ Mode Hemat Aktif (GUI 1 FPS) • Output Streamer Tetap Berjalan Penuh di Latar Belakang")
+        else:
+            self.btn_eco.config(text="⚡ Mode Hemat (F9)", bg="#334155", fg="#cbd5e1")
+            fps = self.cfg.get("streaming", {}).get("fps", 25)
+            self.render_interval_ms = max(int(1000 / fps), 25)
+            self.update_status("🖥️ Mode Studio Aktif (Tampilan Layar Monitor Framerate Penuh)")
+
     def update_frame_loop(self):
         try:
             gui_rgb = self.compositor.get_latest_gui_frame()
             if gui_rgb is not None:
                 gh, gw, _ = gui_rgb.shape
+
+                # Jika dalam Mode Hemat, tampilkan overlay indikator hemat energi di layar lokal
+                if getattr(self, "is_eco_mode", False):
+                    cv2.putText(
+                        gui_rgb, 
+                        "MODE HEMAT (1 FPS GUI) - STREAMING FULL AKTIF (F9 UNTUK STUDIO)", 
+                        (14, 26), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.55, 
+                        (0, 255, 255), 
+                        2, 
+                        cv2.LINE_AA
+                    )
+
                 # Gunakan Image.frombuffer agar ZERO-COPY tanpa alokasi heap dari numpy ke PIL!
                 pil_img = Image.frombuffer("RGB", (gw, gh), gui_rgb, "raw", "RGB", 0, 1)
 
@@ -895,7 +945,8 @@ class CCTVApp:
         except Exception:
             pass
 
-        self.root.after(self.render_interval_ms, self.update_frame_loop)
+        interval = 1000 if getattr(self, "is_eco_mode", False) else self.render_interval_ms
+        self.root.after(interval, self.update_frame_loop)
 
     def _status_timer_tick(self):
         """Timer independen 1 detik untuk memantau status streaming & menghitung durasi LIVE secara real-time"""
@@ -1309,7 +1360,45 @@ class CCTVApp:
         self.root.destroy()
         sys.exit(0)
 
+_single_instance_socket = None
+
+def ensure_single_instance(port=49382):
+    """
+    Mencegah aplikasi terbuka ganda saat pengguna mengklik ikon berkali-kali.
+    Mengunci port loopback lokal (127.0.0.1:49382).
+    Jika sudah ada PosRonda yang berjalan, proses kedua langsung keluar tanpa membuka jendela baru.
+    """
+    global _single_instance_socket
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", port))
+        s.listen(1)
+        _single_instance_socket = s
+        return True
+    except OSError:
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            messagebox.showinfo(
+                "PosRonda Sudah Berjalan",
+                "Aplikasi PosRonda sudah aktif atau sedang berjalan di komputer Anda.\n"
+                "Silakan periksa jendela yang sudah terbuka atau icon di taskbar.",
+                parent=root
+            )
+            root.destroy()
+        except Exception:
+            pass
+        return False
+
 def main():
+    # 0. Single-instance lock: cegah multi-window jika user klik berkali-kali
+    if not ensure_single_instance():
+        sys.exit(0)
+
     # 1. Pre-flight check (Deteksi Python & FFmpeg)
     ready = check_env.run_check(show_gui_if_missing=True)
     if not ready:

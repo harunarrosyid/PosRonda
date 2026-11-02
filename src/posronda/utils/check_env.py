@@ -67,9 +67,16 @@ def open_url(url):
 def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
     root = tk.Tk()
     root.title("Pemeriksa Sistem - PosRonda v4.0")
-    root.geometry("660x510")
     root.resizable(False, False)
     root.configure(bg="#0b0f19")
+
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    w = min(660, sw - 40)
+    h = min(480, sh - 100)
+    x = max(0, (sw - w) // 2)
+    y = max(0, (sh - h) // 2)
+    root.geometry(f"{w}x{h}+{x}+{y}")
 
     style = ttk.Style()
     style.theme_use("clam")

@@ -62,11 +62,19 @@ class SettingsDialog(tk.Toplevel):
     def __init__(self, parent, config, on_save_callback, initial_tab=None):
         super().__init__(parent)
         self.title("Pengaturan PosRonda v4.0 - Surveillance Hub Control Center")
-        self.geometry("850x740")
-        self.minsize(800, 700)
         self.configure(bg="#0b0f19")
         self.transient(parent)
         self.grab_set()
+
+        # Ukuran adaptif terhadap resolusi layar pengguna (Aman 100% untuk layar 1366x768)
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        dlg_w = min(860, screen_w - 40)
+        dlg_h = min(560, screen_h - 100) # Menjamin bilah tombol selalu berada di atas taskbar Windows!
+        x = max(0, (screen_w - dlg_w) // 2)
+        y = max(0, (screen_h - dlg_h) // 2)
+        self.geometry(f"{dlg_w}x{dlg_h}+{x}+{y}")
+        self.minsize(680, 440)
 
         self.cfg = config
         self.on_save = on_save_callback
@@ -664,11 +672,29 @@ class SettingsDialog(tk.Toplevel):
 
     # --- TAB 2: SERVER & TUJUAN SIARAN (YouTube / Private RTMP / Local Recording) ---
     def build_server_tab(self, parent):
+        canvas = tk.Canvas(parent, bg="#0f172a", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        scroll_frame = tk.Frame(canvas, bg="#0f172a")
+
+        scroll_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        cw_id = canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        def _on_canvas_resize(e):
+            canvas.itemconfig(cw_id, width=e.width)
+        canvas.bind("<Configure>", _on_canvas_resize)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
         stream_cfg = self.cfg.get("streaming", {})
         yt_cfg = self.cfg.get("youtube_api", {})
 
         # CARD TARGET SELECTOR
-        c_mode = tk.Frame(parent, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
+        c_mode = tk.Frame(scroll_frame, bg="#1e293b", padx=14, pady=12, highlightthickness=1, highlightbackground="#334155")
         c_mode.pack(fill="x", pady=(0, 10))
 
         tk.Label(c_mode, text="🎯 Tujuan Siaran & Penyimpanan (Broadcast Destination)", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 10, "bold")).pack(anchor="w")
@@ -696,7 +722,7 @@ class SettingsDialog(tk.Toplevel):
         self.cmb_stream_mode.bind("<<ComboboxSelected>>", lambda e: self.on_stream_mode_changed())
 
         # CONTAINER DINAMIS
-        self.f_dynamic_server = tk.Frame(parent, bg="#0f172a")
+        self.f_dynamic_server = tk.Frame(scroll_frame, bg="#0f172a")
         self.f_dynamic_server.pack(fill="both", expand=True)
 
         # 1. CARD PRIVATE RTMP (Untuk Klien Bonafide / Gengsi)
