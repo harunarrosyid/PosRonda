@@ -1151,11 +1151,15 @@ class SettingsDialog(tk.Toplevel):
     def open_buy_license_info(self):
         messagebox.showinfo(
             "Pembelian Lisensi PosRonda PRO",
-            "🛡️ PosRonda PRO Edition dirancang untuk mendukung teknisi CCTV dan pengembangan berkelanjutan.\n\n"
-            "Untuk pemesanan lisensi komersial & white-labeling kustom:\n"
-            "• Email: support@posronda.org / dev@posronda.internal\n"
-            "• Lisensi berlaku seumur hidup (Lifetime) per mesin/unit klien.\n\n"
-            "Terima kasih telah mendukung keamanan lingkungan dan proyek ini!",
+            "PosRonda PRO Edition ditujukan untuk instalasi komersial dan teknisi CCTV.\n\n"
+            "Fitur PRO meliputi:\n"
+            "• Kustomisasi nama/logo usaha (White-Labeling)\n"
+            "• Watermark siaran kustom\n"
+            "• Kunci PIN pengaturan\n\n"
+            "Untuk pemesanan lisensi dan aktivasi:\n"
+            "• Website: https://ngulonstudio.web.id\n"
+            "• Email: ngulonstudio@gmail.com (Alternatif langsung)\n\n"
+            "Kirimkan Nama Pemilik dan Nama Usaha Anda untuk penerbitan Serial Key.",
             parent=self
         )
 

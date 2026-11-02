@@ -70,3 +70,11 @@ Untuk menyalakan perangkat secara otomatis saat pengisi daya (charger) terhubung
 2. Buka menu **Config** -> **Power**.
 3. Set opsi **`Power On with AC Attach`** ke **`[Enabled]`**.
 4. Simpan pengaturan dengan menekan **`F10`**.
+
+---
+
+## 5. Kontak & Pemesanan Lisensi PRO
+
+Untuk pemesanan lisensi PosRonda PRO, kustomisasi merek (white-labeling), atau bantuan teknis:
+* **Email:** [ngulonstudio@gmail.com](mailto:ngulonstudio@gmail.com)
+* **Website:** [https://ngulonstudio.web.id](https://ngulonstudio.web.id)

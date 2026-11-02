@@ -53,5 +53,9 @@ Kamera dapat ditambahkan melalui menu Pengaturan (**F2**) atau langsung pada `co
 | `F7` | Mulai / Akhiri streaming atau sesi rekaman |
 | `F11` / `Esc` | Masuk / Keluar Fullscreen |
 
-## Lisensi
+## Lisensi & Kontak
 PosRonda tersedia dalam edisi Community (bebas digunakan untuk keperluan pribadi, lingkungan warga, dan non-komersial) serta edisi Pro untuk kebutuhan integrasi komersial.
+
+Untuk pemesanan lisensi Pro, integrasi kustom, atau bantuan teknis:
+* Email: [ngulonstudio@gmail.com](mailto:ngulonstudio@gmail.com)
+* Website: [ngulonstudio.web.id](https://ngulonstudio.web.id)

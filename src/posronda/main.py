@@ -1029,7 +1029,10 @@ class CCTVApp:
             f_card,
             text="Informasi Lisensi:\n"
                  "• Community Edition: Bebas digunakan untuk kebutuhan non-komersial, lingkungan warga, dan fasilitas umum.\n\n"
-                 "• PRO Edition: Ditujukan untuk instalasi komersial dengan fitur white-labeling, custom watermark, dan kunci PIN pengaturan.",
+                 "• PRO Edition: Ditujukan untuk instalasi komersial dengan fitur white-labeling, custom watermark, dan kunci PIN pengaturan.\n\n"
+                 "Kontak & Pemesanan:\n"
+                 "• Email: ngulonstudio@gmail.com\n"
+                 "• Website: https://ngulonstudio.web.id",
             bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 8), justify="left", wraplength=460
         ).pack(anchor="w", pady=(10, 14))
 
