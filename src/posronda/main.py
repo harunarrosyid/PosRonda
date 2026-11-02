@@ -23,6 +23,8 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
 import time
 import threading
 import datetime
+import webbrowser
+import urllib.parse
 import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk
@@ -284,6 +286,11 @@ class CCTVApp:
         # Mulai Timer Status & Durasi Live Independen (1 Detik)
         self.root.after(1000, self._status_timer_tick)
         self._update_page_ui()
+
+        # Inisialisasi pengingat lisensi (muncul 15 detik awal & tiap 11 jam)
+        self._nag_popup_window = None
+        self._last_nag_time = time.time()
+        self.root.after(15000, self.check_and_show_nag_screen)
 
         # Cek jika RTSP masih default, tawarkan buka pengaturan
         if any("192.168.1.101" in c.get("rtsp_url", "") for c in self.cfg.get("cameras", [])):
@@ -658,6 +665,7 @@ class CCTVApp:
                 old_id = self.current_broadcast.get("broadcast_id")
                 self.youtube_mgr.end_broadcast(old_id)
                 force_fresh = True
+                self.root.after(0, self.check_and_show_nag_screen)
 
     def toggle_pause(self):
         """Menjeda atau melanjutkan push streaming / perekaman (F6)"""
@@ -886,6 +894,11 @@ class CCTVApp:
     def _status_timer_tick(self):
         """Timer independen 1 detik untuk memantau status streaming & menghitung durasi LIVE secara real-time"""
         try:
+            # Pengingat lisensi berkala setiap 11 jam (39600 detik)
+            if time.time() - getattr(self, "_last_nag_time", 0) >= 39600:
+                self._last_nag_time = time.time()
+                self.check_and_show_nag_screen()
+
             self._update_page_ui()
             stream_mode = self.cfg.get("streaming", {}).get("mode", "youtube")
 
@@ -1002,6 +1015,159 @@ class CCTVApp:
 
         self.lbl_status_text.config(text=text)
 
+    def check_and_show_nag_screen(self):
+        """
+        Menampilkan dialog pengingat lisensi (WinRAR-style) jika menggunakan Community Edition.
+        Tidak akan memblokir proses streaming atau pemantauan di latar belakang.
+        """
+        lic = LicenseManager.get_license_info()
+        if lic.get("is_pro"):
+            return
+
+        # Cegah duplikasi jika dialog sudah terbuka di layar
+        if getattr(self, "_nag_popup_window", None) and self._nag_popup_window.winfo_exists():
+            return
+
+        dlg = tk.Toplevel(self.root)
+        self._nag_popup_window = dlg
+        dlg.title("Pemberitahuan Lisensi PosRonda")
+        dlg.geometry("540x330")
+        dlg.resizable(False, False)
+        dlg.configure(bg="#0b0f19")
+        dlg.transient(self.root)
+        dlg.attributes("-topmost", True)
+
+        # Center dialog pada posisi window utama
+        dlg.update_idletasks()
+        rw = self.root.winfo_width()
+        rh = self.root.winfo_height()
+        rx = self.root.winfo_x()
+        ry = self.root.winfo_y()
+        w, h = 540, 330
+        x = rx + max(0, (rw - w) // 2)
+        y = ry + max(0, (rh - h) // 2)
+        dlg.geometry(f"{w}x{h}+{x}+{y}")
+
+        card = tk.Frame(dlg, bg="#1e293b", padx=20, pady=18, highlightthickness=1, highlightbackground="#334155")
+        card.pack(fill="both", expand=True, padx=14, pady=14)
+
+        # Header
+        h_row = tk.Frame(card, bg="#1e293b")
+        h_row.pack(fill="x", pady=(0, 10))
+        tk.Label(h_row, text="PosRonda Community Edition", bg="#1e293b", fg="#f8fafc", font=("Segoe UI", 12, "bold")).pack(side="left")
+        tk.Label(h_row, text="Evaluasi / Non-Komersial", bg="#334155", fg="#94a3b8", font=("Segoe UI", 8), padx=8, pady=2).pack(side="right")
+
+        # Deskripsi santai & profesional ala WinRAR
+        desc_text = (
+            "Aplikasi ini saat ini berjalan di bawah lisensi Community Edition.\n\n"
+            "Untuk penggunaan komersial pada perkantoran, ruko, industri, "
+            "serta menghilangkan pengingat berkala ini dan mengaktifkan kustomisasi "
+            "identitas merek (White-Labeling), Anda dapat memesan lisensi PosRonda PRO.\n\n"
+            "Dukungan & Pemesanan:\n"
+            "• Website : ngulonstudio.web.id\n"
+            "• Email   : ngulonstudio@gmail.com"
+        )
+        tk.Label(card, text=desc_text, bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 9), justify="left", wraplength=480).pack(fill="x", pady=(0, 10))
+
+        status_lbl = tk.Label(card, text="", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 8))
+        status_lbl.pack(fill="x", pady=(0, 6))
+
+        # Tombol aksi
+        btn_bar = tk.Frame(card, bg="#1e293b")
+        btn_bar.pack(fill="x", side="bottom")
+
+        def on_buy():
+            # 1. Salin email ke clipboard secara otomatis
+            try:
+                self.root.clipboard_clear()
+                self.root.clipboard_append("ngulonstudio@gmail.com")
+                self.root.update()
+            except Exception:
+                pass
+
+            # 2. Buka Gmail Web Compose dengan template lengkap di browser default
+            subject = urllib.parse.quote("Pemesanan Lisensi PosRonda PRO")
+            body = urllib.parse.quote(
+                "Halo Tim Ngulon Studio,\n\n"
+                "Saya tertarik untuk memesan lisensi PosRonda PRO untuk instansi/perusahaan kami.\n\n"
+                "Nama Pemesan: \n"
+                "Nama Instansi / Usaha: \n"
+                "Jumlah Titik CCTV: \n"
+                "Kebutuhan Kustomisasi Merek: \n\n"
+                "Mohon info instruksi aktivasi dan penawarannya. Terima kasih."
+            )
+            gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to=ngulonstudio@gmail.com&su={subject}&body={body}"
+            fallback_url = "https://ngulonstudio.web.id"
+
+            status_lbl.config(text="✓ Alamat ngulonstudio@gmail.com disalin ke clipboard. Membuka browser...")
+            try:
+                opened = webbrowser.open_new(gmail_url)
+                if not opened:
+                    webbrowser.open_new(fallback_url)
+            except Exception:
+                webbrowser.open_new(fallback_url)
+
+        def on_enter_key():
+            dlg.destroy()
+            self.open_settings(initial_tab="license")
+
+        def on_close():
+            dlg.destroy()
+
+        # Tombol Beli Lisensi (Default Focus)
+        btn_buy = tk.Button(
+            btn_bar,
+            text="Beli Lisensi",
+            command=on_buy,
+            bg="#2563eb",
+            fg="white",
+            activebackground="#1d4ed8",
+            activeforeground="white",
+            font=("Segoe UI", 9, "bold"),
+            padx=14,
+            pady=6,
+            relief="flat",
+            cursor="hand2"
+        )
+        btn_buy.pack(side="left", padx=(0, 8))
+
+        btn_key = tk.Button(
+            btn_bar,
+            text="Masukkan Kunci Lisensi",
+            command=on_enter_key,
+            bg="#334155",
+            fg="#e2e8f0",
+            activebackground="#475569",
+            activeforeground="white",
+            font=("Segoe UI", 9),
+            padx=12,
+            pady=6,
+            relief="flat",
+            cursor="hand2"
+        )
+        btn_key.pack(side="left", padx=(0, 8))
+
+        btn_close = tk.Button(
+            btn_bar,
+            text="Tutup",
+            command=on_close,
+            bg="#1e293b",
+            fg="#94a3b8",
+            activebackground="#334155",
+            activeforeground="#f1f5f9",
+            font=("Segoe UI", 9),
+            padx=14,
+            pady=6,
+            relief="flat",
+            cursor="hand2"
+        )
+        btn_close.pack(side="right")
+
+        # Focus otomatis ke tombol Beli Lisensi
+        btn_buy.focus_set()
+        dlg.bind("<Return>", lambda e: on_buy())
+        dlg.bind("<Escape>", lambda e: on_close())
+
     def open_about_dialog(self):
         lic = LicenseManager.get_license_info()
         dlg = tk.Toplevel(self.root)
@@ -1047,7 +1213,7 @@ class CCTVApp:
 
         tk.Button(
             f_btns, text="Pengaturan & Lisensi", bg="#0284c7", fg="#ffffff", relief="flat", font=("Segoe UI", 8, "bold"),
-            padx=12, pady=4, cursor="hand2", command=lambda: [dlg.destroy(), self.open_settings()]
+            padx=12, pady=4, cursor="hand2", command=lambda: [dlg.destroy(), self.open_settings("license")]
         ).pack(side="right")
 
     def toggle_fullscreen(self):
@@ -1058,7 +1224,7 @@ class CCTVApp:
         self.is_fullscreen = False
         self.root.attributes("-fullscreen", False)
 
-    def open_settings(self):
+    def open_settings(self, initial_tab=None):
         def on_saved(new_cfg):
             self.cfg = new_cfg
             config_manager.save_config(new_cfg)
@@ -1088,7 +1254,7 @@ class CCTVApp:
             self.stream_trigger.set()
             messagebox.showinfo("Berhasil", "Pengaturan PosRonda disimpan. Kamera & Live Streaming di-refresh!")
 
-        SettingsDialog(self.root, self.cfg, on_saved)
+        SettingsDialog(self.root, self.cfg, on_saved, initial_tab=initial_tab)
 
     def on_closing(self):
         # Bersihkan semua proses saat aplikasi ditutup

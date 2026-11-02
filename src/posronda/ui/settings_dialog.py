@@ -33,7 +33,7 @@ except ImportError:
     from license_manager import LicenseManager
 
 class SettingsDialog(tk.Toplevel):
-    def __init__(self, parent, config, on_save_callback):
+    def __init__(self, parent, config, on_save_callback, initial_tab=None):
         super().__init__(parent)
         self.title("Pengaturan PosRonda v4.0 - Surveillance Hub Control Center")
         self.geometry("850x740")
@@ -44,6 +44,7 @@ class SettingsDialog(tk.Toplevel):
 
         self.cfg = config
         self.on_save = on_save_callback
+        self.initial_tab = initial_tab
         self.pwd_visible = False
         self.stream_key_visible = False
         self.scanned_cams = []
@@ -139,6 +140,9 @@ class SettingsDialog(tk.Toplevel):
         tab_lic = tk.Frame(notebook, bg="#0f172a", padx=16, pady=14)
         notebook.add(tab_lic, text="💎 Lisensi")
         self.build_license_tab(tab_lic)
+
+        if getattr(self, "initial_tab", None) in ["license", "lic", 5]:
+            notebook.select(tab_lic)
 
         # 3. Bottom Action Bar
         bottom_bar = tk.Frame(self, bg="#0b0f19", padx=16, pady=10)
@@ -1149,19 +1153,46 @@ class SettingsDialog(tk.Toplevel):
             messagebox.showerror("Gagal Pasang Lisensi", msg, parent=self)
 
     def open_buy_license_info(self):
-        messagebox.showinfo(
+        try:
+            self.clipboard_clear()
+            self.clipboard_append("ngulonstudio@gmail.com")
+            self.update()
+        except Exception:
+            pass
+
+        choice = messagebox.askyesno(
             "Pembelian Lisensi PosRonda PRO",
             "PosRonda PRO Edition ditujukan untuk instalasi komersial dan teknisi CCTV.\n\n"
             "Fitur PRO meliputi:\n"
             "• Kustomisasi nama/logo usaha (White-Labeling)\n"
             "• Watermark siaran kustom\n"
+            "• Menghilangkan jendela pengingat lisensi berkala\n"
             "• Kunci PIN pengaturan\n\n"
-            "Untuk pemesanan lisensi dan aktivasi:\n"
-            "• Website: https://ngulonstudio.web.id\n"
-            "• Email: ngulonstudio@gmail.com (Alternatif langsung)\n\n"
-            "Kirimkan Nama Pemilik dan Nama Usaha Anda untuk penerbitan Serial Key.",
+            "Kontak Pemesanan (Alamat email telah disalin ke clipboard):\n"
+            "• Email: ngulonstudio@gmail.com\n"
+            "• Website: https://ngulonstudio.web.id\n\n"
+            "Apakah Anda ingin membuka form pemesanan email di browser sekarang?",
             parent=self
         )
+        if choice:
+            import urllib.parse
+            import webbrowser
+            subject = urllib.parse.quote("Pemesanan Lisensi PosRonda PRO")
+            body = urllib.parse.quote(
+                "Halo Tim Ngulon Studio,\n\n"
+                "Saya tertarik untuk memesan lisensi PosRonda PRO.\n\n"
+                "Nama Pemesan: \n"
+                "Nama Instansi / Usaha: \n"
+                "Jumlah Titik CCTV: \n"
+                "Kebutuhan Kustomisasi: \n\n"
+                "Terima kasih."
+            )
+            gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to=ngulonstudio@gmail.com&su={subject}&body={body}"
+            try:
+                if not webbrowser.open_new(gmail_url):
+                    webbrowser.open_new("https://ngulonstudio.web.id")
+            except Exception:
+                webbrowser.open_new("https://ngulonstudio.web.id")
 
     def save_all(self):
         new_cams = []
