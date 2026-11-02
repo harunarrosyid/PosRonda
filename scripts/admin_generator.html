@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PosRonda PRO - Admin License Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0b0f19; color: #f1f5f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 16px; }
+    .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; width: 100%; max-width: 520px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h1 { font-size: 20px; font-weight: 700; color: #38bdf8; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .sub { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px; }
+    input { width: 100%; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 10px 12px; color: #f8fafc; font-size: 14px; margin-bottom: 16px; outline: none; }
+    input:focus { border-color: #38bdf8; ring: 2px solid #38bdf8; }
+    button.btn-primary { width: 100%; background: #2563eb; color: white; border: none; border-radius: 6px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    button.btn-primary:hover { background: #1d4ed8; }
+    .result-box { display: none; margin-top: 20px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; }
+    .key-badge { font-family: monospace; font-size: 18px; font-weight: 700; color: #4ade80; background: #022c22; border: 1px dashed #10b981; padding: 10px; border-radius: 6px; text-align: center; margin: 10px 0; letter-spacing: 2px; }
+    textarea { width: 100%; height: 180px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; color: #cbd5e1; font-family: monospace; font-size: 12px; padding: 10px; margin-top: 8px; resize: none; }
+    .btn-copy { width: 100%; background: #10b981; color: #022c22; font-weight: 700; border: none; border-radius: 6px; padding: 10px; font-size: 13px; cursor: pointer; margin-top: 8px; }
+    .btn-copy:hover { background: #34d399; }
+    .copied-toast { font-size: 12px; color: #38bdf8; text-align: center; margin-top: 6px; display: none; }
+    .footer { font-size: 11px; color: #64748b; text-align: center; margin-top: 18px; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>🛡️ PosRonda PRO Generator</h1>
+    <p class="sub">Alat internal Admin Ngulon Studio untuk penerbitan Serial Key.</p>
+
+    <label for="holder">Nama Pemilik / Pembeli:</label>
+    <input type="text" id="holder" placeholder="Contoh: Budi Santoso" autocomplete="off">
+
+    <label for="org">Nama Toko / Instansi / Usaha:</label>
+    <input type="text" id="org" placeholder="Contoh: Berkah CCTV Security" autocomplete="off">
+
+    <button class="btn-primary" onclick="generateKey()">⚡ Terbitkan Serial Key</button>
+
+    <div class="result-box" id="resultBox">
+      <div style="font-size: 12px; color: #94a3b8;">Serial Key Resmi:</div>
+      <div class="key-badge" id="keyBadge">XXXX-XXXX-XXXX-XXXX</div>
+
+      <div style="font-size: 12px; color: #94a3b8; margin-top: 12px;">Draf Pesan untuk Pembeli (WhatsApp / Email):</div>
+      <textarea id="templateText" readonly></textarea>
+      
+      <button class="btn-copy" onclick="copyTemplate()">📋 Salin Pesan ke Clipboard</button>
+      <div class="copied-toast" id="copiedToast">✓ Berhasil disalin! Tinggal tempel (paste) di WhatsApp atau Email pembeli.</div>
+    </div>
+
+    <div class="footer">100% Offline • Keamanan SHA-256 Validated • Ngulon Studio</div>
+  </div>
+
+  <script>
+    const SALT = "POSRONDA_SECURE_SALT_v4_2026_CORE";
+
+    async function sha256(str) {
+      const buf = new TextEncoder().encode(str);
+      const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+      const arr = Array.from(new Uint8Array(hashBuf));
+      return arr.map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    }
+
+    async function generateKey() {
+      const holder = document.getElementById("holder").value.trim();
+      const org = document.getElementById("org").value.trim() || "Komersial";
+
+      if (!holder) {
+        alert("Harap masukkan Nama Pemilik/Pembeli.");
+        return;
+      }
+
+      const raw = `${holder}:${org}:${SALT}`;
+      const fullHash = await sha256(raw);
+      const serialKey = fullHash.substring(0, 16);
+
+      document.getElementById("keyBadge").innerText = serialKey;
+
+      const template = 
+`Halo ${holder},
+
+Terima kasih atas pemesanan lisensi PosRonda PRO.
+Berikut data lisensi resmi untuk instalasi Anda:
+
+• Nama Pemilik    : ${holder}
+• Organisasi/Toko : ${org}
+• Serial Key      : ${serialKey}
+
+Cara Aktivasi di PosRonda:
+1. Buka aplikasi PosRonda di laptop Anda.
+2. Tekan tombol F2 (Pengaturan), lalu buka tab 'Lisensi'.
+3. Masukkan Nama Pemilik, Organisasi, dan Serial Key di atas secara persis.
+4. Klik tombol 'Pasang Lisensi PRO', lalu restart aplikasi.
+
+Selamat menikmati fitur PosRonda PRO (White-labeling, Custom Brand Watermark, dan tanpa pengingat berkala).
+
+Salam hangat,
+Ngulon Studio
+https://ngulonstudio.web.id`;
+
+      document.getElementById("templateText").value = template;
+      document.getElementById("resultBox").style.display = "block";
+      document.getElementById("copiedToast").style.display = "none";
+    }
+
+    function copyTemplate() {
+      const text = document.getElementById("templateText").value;
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById("copiedToast");
+        toast.style.display = "block";
+        setTimeout(() => { toast.style.display = "none"; }, 4000);
+      });
+    }
+  </script>
+</body>
+</html>
