@@ -12,6 +12,7 @@ import uuid
 import re
 import time
 import base64
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 
 WS_DISCOVERY_IP = "239.255.255.250"
@@ -35,18 +36,23 @@ PROBE_TEMPLATE = """<?xml version="1.0" encoding="utf-8"?>
 </Envelope>"""
 
 COMMON_RTSP_PATHS = [
-    "/live/ch0",                                 # V380, V360, Tuya, generic
-    "/onvif1",                                   # ONVIF profile 1
-    "/ch0",                                      # Generic
     "/Streaming/Channels/101",                   # Hikvision, Hilook, Ezviz (Main stream)
-    "/Streaming/Channels/102",                   # Hikvision, Ezviz (Sub stream)
     "/cam/realmonitor?channel=1&subtype=0",      # Dahua, Imou (Main stream)
-    "/cam/realmonitor?channel=1&subtype=1",      # Dahua, Imou (Sub stream)
-    "/h264Preview_01_main",                      # Reolink
-    "/stream1",                                  # TP-Link Tapo
+    "/stream1",                                  # TP-Link Tapo (Main stream)
+    "/live/ch0",                                 # V380, V360, Tuya, generic
     "/ch0_0.264",                                # Xiongmai / XM / Yoosee
+    "/onvif1",                                   # ONVIF profile 1
+    "/unicast/c1/s0/live",                       # Uniview / UNV (Main stream)
+    "/h264Preview_01_main",                      # Reolink (Main stream)
+    "/ch0",                                      # Generic
+    "/Streaming/Channels/102",                   # Hikvision, Ezviz (Sub stream)
+    "/cam/realmonitor?channel=1&subtype=1",      # Dahua, Imou (Sub stream)
+    "/stream2",                                  # TP-Link Tapo (Sub stream)
     "/11",                                       # Besder / generic
-    "/video1"                                    # Older IP cameras
+    "/ch0_1.264",                                # Xiongmai / XM (Sub stream)
+    "/video1",                                   # Older IP cameras
+    "/media/video1",                             # Sony / Axis
+    "/onvif2",                                   # ONVIF profile 2
 ]
 
 def get_local_ip_and_subnet():
@@ -165,40 +171,127 @@ def scan_rtsp_network(subnet=None, ports=[554, 8554], max_workers=70):
 
     return discovered
 
-def probe_rtsp_path(ip, port, path, username="", password="", timeout=0.6):
+def probe_rtsp_path(ip, port, path, username="", password="", timeout=0.8):
     """
-    Kirim RTSP DESCRIBE request murni via TCP socket.
-    Sangat cepat (hanya ~50ms), tanpa butuh OpenCV atau FFmpeg.
-    200 OK -> Path valid & stream siap diambil.
-    401 Unauthorized -> Path valid (kamera ada dan menuntut kredensial).
+    Kirim RTSP DESCRIBE request murni via TCP socket dengan dukungan penuh
+    otentikasi RFC 2617 Digest dan Basic.
+    200 OK -> Path valid & stream siap diambil langsung.
+    401 -> Menuntut otentikasi (Digest challenge).
+    404 -> Path tidak tersedia pada kamera ini.
     """
+    clean_path = path if path.startswith("/") or not path else f"/{path}"
+    uri = f"rtsp://{ip}:{port}{clean_path}"
+
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(timeout)
         s.connect((ip, port))
-        
+
+        # 1. Permintaan DESCRIBE awal
         req = (
-            f"DESCRIBE rtsp://{ip}:{port}{path} RTSP/1.0\r\n"
+            f"DESCRIBE {uri} RTSP/1.0\r\n"
             f"CSeq: 1\r\n"
             f"User-Agent: PosRonda-CCTV-Scanner\r\n"
-            f"Accept: application/sdp\r\n"
+            f"Accept: application/sdp\r\n\r\n"
         )
-        if username and password:
-            token = base64.b64encode(f"{username}:{password}".encode()).decode()
-            req += f"Authorization: Basic {token}\r\n"
-        req += "\r\n"
-        
         s.sendall(req.encode("ascii"))
-        resp = s.recv(1024).decode("latin-1", errors="ignore")
-        s.close()
-        
-        if "RTSP/1.0 200" in resp or "RTSP/1.0 401" in resp:
-            return True, resp.split("\r\n")[0]
-        return False, resp.split("\r\n")[0] if resp else "Empty"
-    except Exception:
-        return False, "Error"
+        resp = s.recv(2048).decode("latin-1", errors="ignore")
 
-def build_rtsp_url(ip, port=554, username="", password="", path="/live/ch0"):
+        if "RTSP/1.0 200" in resp:
+            s.close()
+            return True, "200 OK"
+
+        if "RTSP/1.0 401" in resp:
+            # 2. Kamera meminta otentikasi
+            if not username:
+                s.close()
+                return False, "401 Butuh Password"
+
+            realm_m = re.search(r'realm="([^"]+)"', resp, re.IGNORECASE)
+            nonce_m = re.search(r'nonce="([^"]+)"', resp, re.IGNORECASE)
+
+            if realm_m and nonce_m:
+                realm = realm_m.group(1)
+                nonce = nonce_m.group(1)
+                qop_m = re.search(r'qop="([^"]+)"', resp, re.IGNORECASE)
+                qop = qop_m.group(1) if qop_m else None
+
+                ha1 = hashlib.md5(f"{username}:{realm}:{password}".encode("utf-8")).hexdigest()
+                ha2 = hashlib.md5(f"DESCRIBE:{uri}".encode("utf-8")).hexdigest()
+
+                if qop and "auth" in qop.lower():
+                    nc = "00000001"
+                    cnonce = "0a4f113b"
+                    resp_hash = hashlib.md5(f"{ha1}:{nonce}:{nc}:{cnonce}:auth:{ha2}".encode("utf-8")).hexdigest()
+                    auth_hdr = (
+                        f'Digest username="{username}", realm="{realm}", nonce="{nonce}", '
+                        f'uri="{uri}", response="{resp_hash}", qop=auth, nc={nc}, cnonce="{cnonce}"'
+                    )
+                else:
+                    resp_hash = hashlib.md5(f"{ha1}:{nonce}:{ha2}".encode("utf-8")).hexdigest()
+                    auth_hdr = f'Digest username="{username}", realm="{realm}", nonce="{nonce}", uri="{uri}", response="{resp_hash}"'
+
+                req2 = (
+                    f"DESCRIBE {uri} RTSP/1.0\r\n"
+                    f"CSeq: 2\r\n"
+                    f"User-Agent: PosRonda-CCTV-Scanner\r\n"
+                    f"Accept: application/sdp\r\n"
+                    f"Authorization: {auth_hdr}\r\n\r\n"
+                )
+
+                try:
+                    s.sendall(req2.encode("ascii"))
+                    resp2 = s.recv(2048).decode("latin-1", errors="ignore")
+                except Exception:
+                    s.close()
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(timeout)
+                    s.connect((ip, port))
+                    s.sendall(req2.encode("ascii"))
+                    resp2 = s.recv(2048).decode("latin-1", errors="ignore")
+
+                s.close()
+                if "RTSP/1.0 200" in resp2:
+                    return True, "200 OK"
+                if "RTSP/1.0 404" in resp2:
+                    return False, "404 Not Found"
+                if "RTSP/1.0 401" in resp2:
+                    return False, "401 Kredensial Salah"
+                return False, resp2.split("\r\n")[0] if resp2 else "Empty"
+
+            else:
+                token = base64.b64encode(f"{username}:{password}".encode()).decode()
+                req_basic = (
+                    f"DESCRIBE {uri} RTSP/1.0\r\n"
+                    f"CSeq: 2\r\n"
+                    f"User-Agent: PosRonda-CCTV-Scanner\r\n"
+                    f"Accept: application/sdp\r\n"
+                    f"Authorization: Basic {token}\r\n\r\n"
+                )
+                s.close()
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(timeout)
+                s.connect((ip, port))
+                s.sendall(req_basic.encode("ascii"))
+                resp_basic = s.recv(2048).decode("latin-1", errors="ignore")
+                s.close()
+                if "RTSP/1.0 200" in resp_basic:
+                    return True, "200 OK"
+                if "RTSP/1.0 404" in resp_basic:
+                    return False, "404 Not Found"
+                if "RTSP/1.0 401" in resp_basic:
+                    return False, "401 Kredensial Salah"
+                return False, resp_basic.split("\r\n")[0] if resp_basic else "Empty"
+
+        s.close()
+        if "RTSP/1.0 404" in resp:
+            return False, "404 Not Found"
+        return False, resp.split("\r\n")[0] if resp else "Empty"
+
+    except Exception:
+        return False, "Error / Offline"
+
+def build_rtsp_url(ip, port=554, username="", password="", path="/Streaming/Channels/101"):
     """Membangun string RTSP lengkap dengan format yang benar"""
     auth = ""
     u = username.strip() if username else ""
@@ -211,30 +304,65 @@ def build_rtsp_url(ip, port=554, username="", password="", path="/live/ch0"):
     clean_path = path if path.startswith("/") or not path else f"/{path}"
     return f"rtsp://{auth}{ip}:{port}{clean_path}"
 
-def find_best_rtsp_url(ip, port=554, username="", password="", probe=True):
+def find_best_rtsp_url(ip, port=554, username="", password="", probe=True, cam_hint="", return_auth_info=False):
     """
     Mencari jalur RTSP terbaik untuk IP kamera tertentu.
-    Jika probe=True, mencoba probe jalur umum secara paralel.
+    Jika probe=True, mencoba probe seluruh jalur umum secara paralel dengan Digest Auth.
     """
+    hint_lower = str(cam_hint).lower()
+    ordered_paths = list(COMMON_RTSP_PATHS)
+
+    if any(h in hint_lower for h in ["hikvision", "hilook", "ezviz"]):
+        preferred = ["/Streaming/Channels/101", "/Streaming/Channels/102"]
+        ordered_paths = preferred + [p for p in ordered_paths if p not in preferred]
+    elif any(d in hint_lower for d in ["dahua", "imou", "general"]):
+        preferred = ["/cam/realmonitor?channel=1&subtype=0", "/cam/realmonitor?channel=1&subtype=1"]
+        ordered_paths = preferred + [p for p in ordered_paths if p not in preferred]
+    elif any(t in hint_lower for t in ["tapo", "tp-link"]):
+        preferred = ["/stream1", "/stream2"]
+        ordered_paths = preferred + [p for p in ordered_paths if p not in preferred]
+    elif "reolink" in hint_lower:
+        preferred = ["/h264Preview_01_main", "/h264Preview_01_sub"]
+        ordered_paths = preferred + [p for p in ordered_paths if p not in preferred]
+    elif any(x in hint_lower for x in ["xm", "xiongmai", "yoosee"]):
+        preferred = ["/ch0_0.264", "/onvif1", "/ch0"]
+        ordered_paths = preferred + [p for p in ordered_paths if p not in preferred]
+    elif "uniview" in hint_lower or "unv" in hint_lower:
+        preferred = ["/unicast/c1/s0/live", "/unicast/c1/s1/live"]
+        ordered_paths = preferred + [p for p in ordered_paths if p not in preferred]
+
     if not probe:
-        primary = build_rtsp_url(ip, port, username, password, "/live/ch0")
-        candidates = [build_rtsp_url(ip, port, username, password, p) for p in COMMON_RTSP_PATHS]
+        primary = build_rtsp_url(ip, port, username, password, ordered_paths[0])
+        candidates = [build_rtsp_url(ip, port, username, password, p) for p in ordered_paths]
+        if return_auth_info:
+            return primary, candidates, False, False
         return primary, candidates, False
 
-    # Probe cepat 5 jalur terpopuler
-    top_paths = COMMON_RTSP_PATHS[:6]
-    best_path = "/live/ch0"
     verified = False
+    needs_auth = False
+    best_path = ordered_paths[0]
 
-    for path in top_paths:
-        ok, _ = probe_rtsp_path(ip, port, path, username, password, timeout=0.5)
+    def _test_p(p):
+        ok, msg = probe_rtsp_path(ip, port, p, username, password, timeout=0.8)
+        return p, ok, msg
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        results = list(executor.map(_test_p, ordered_paths))
+
+    status_map = {p: (ok, msg) for p, ok, msg in results}
+    for p in ordered_paths:
+        ok, msg = status_map.get(p, (False, ""))
         if ok:
-            best_path = path
+            best_path = p
             verified = True
             break
+        if "401" in msg:
+            needs_auth = True
 
     primary = build_rtsp_url(ip, port, username, password, best_path)
-    candidates = [build_rtsp_url(ip, port, username, password, p) for p in COMMON_RTSP_PATHS]
+    candidates = [build_rtsp_url(ip, port, username, password, p) for p in ordered_paths]
+    if return_auth_info:
+        return primary, candidates, verified, needs_auth
     return primary, candidates, verified
 
 def scan_all_cameras(username="admin", password="", default_port=554, probe=True):
@@ -242,7 +370,7 @@ def scan_all_cameras(username="admin", password="", default_port=554, probe=True
     Pindai seluruh kamera di jaringan dan buat URL RTSP yang siap digunakan
     oleh pengguna awam dengan username & password yang dimasukkan.
     """
-    print(f"[PosRonda Scanner] Memulai pemindaian ONVIF & Jaringan...")
+    print("[PosRonda Scanner] Memulai pemindaian ONVIF & Jaringan...")
     
     # 1. Pindai ONVIF WS-Discovery
     onvif_cams = discover_onvif_cameras(timeout=1.6)
@@ -269,7 +397,10 @@ def scan_all_cameras(username="admin", password="", default_port=554, probe=True
     for ip in sorted_ips:
         cam = combined[ip]
         port = cam.get("rtsp_port", default_port)
-        primary_url, candidates, verified = find_best_rtsp_url(ip, port, username, password, probe=probe)
+        cam_hint = cam.get("name", "")
+        primary_url, candidates, verified, needs_auth = find_best_rtsp_url(
+            ip, port, username, password, probe=probe, cam_hint=cam_hint, return_auth_info=True
+        )
         
         final_list.append({
             "ip": ip,
@@ -278,7 +409,8 @@ def scan_all_cameras(username="admin", password="", default_port=554, probe=True
             "rtsp_port": port,
             "primary_url": primary_url,
             "candidate_urls": candidates,
-            "verified": verified
+            "verified": verified,
+            "needs_auth": needs_auth
         })
 
     print(f"[PosRonda Scanner] Selesai! Ditemukan {len(final_list)} kamera aktif.")

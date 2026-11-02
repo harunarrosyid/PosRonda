@@ -11,12 +11,9 @@ import os
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
     "rtsp_transport;tcp|"
     "fflags;nobuffer|"
-    "flags;low_delay|"
-    "framedrop;1|"
     "max_delay;500000|"
     "reorder_queue_size;0|"
-    "stimeout;5000000|"
-    "timeout;5000000|"
+    "stimeout;10000000|"
     "buffer_size;1048576"
 )
 
@@ -55,7 +52,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.1"
+    __version__ = "4.4.2"
 
 class CCTVApp:
     def __init__(self, root):
@@ -931,25 +928,19 @@ class CCTVApp:
                 # Gunakan Image.frombuffer agar ZERO-COPY tanpa alokasi heap dari numpy ke PIL!
                 pil_img = Image.frombuffer("RGB", (gw, gh), gui_rgb, "raw", "RGB", 0, 1)
 
-                cw = self.canvas.winfo_width()
-                ch = self.canvas.winfo_height()
+                cw = max(self.canvas.winfo_width(), 1)
+                ch = max(self.canvas.winfo_height(), 1)
                 offset_x = max((cw - gw) // 2, 0)
                 offset_y = max((ch - gh) // 2, 0)
 
-                if self.tk_photo is None or getattr(self, "_last_dims", None) != (gw, gh):
-                    self.tk_photo = ImageTk.PhotoImage(image=pil_img)
-                    self._last_dims = (gw, gh)
-                    if self.canvas_img_id is None:
-                        self.canvas_img_id = self.canvas.create_image(offset_x, offset_y, anchor="nw", image=self.tk_photo)
-                    else:
-                        self.canvas.coords(self.canvas_img_id, offset_x, offset_y)
-                        self.canvas.itemconfig(self.canvas_img_id, image=self.tk_photo)
-                    self._last_offset = (offset_x, offset_y)
+                self.tk_photo = ImageTk.PhotoImage(image=pil_img)
+                if self.canvas_img_id is None:
+                    self.canvas_img_id = self.canvas.create_image(offset_x, offset_y, anchor="nw", image=self.tk_photo)
                 else:
-                    self.tk_photo.paste(pil_img)
-                    if getattr(self, "_last_offset", None) != (offset_x, offset_y):
-                        self.canvas.coords(self.canvas_img_id, offset_x, offset_y)
-                        self._last_offset = (offset_x, offset_y)
+                    self.canvas.coords(self.canvas_img_id, offset_x, offset_y)
+                    self.canvas.itemconfig(self.canvas_img_id, image=self.tk_photo)
+                self._last_offset = (offset_x, offset_y)
+                self._last_dims = (gw, gh)
 
         except Exception:
             pass

@@ -590,10 +590,18 @@ class SettingsDialog(tk.Toplevel):
             def _finish():
                 if ok:
                     self.lbl_scan_indicator.config(text=f"{cam_label} Berhasil Terhubung! Sinyal kamera aktif.", fg="#4ade80")
-                    messagebox.showinfo("Tes Koneksi Sukses", f"Sinyal {cam_label} DITEMUKAN & AKTIF!\n\nURL: {url}\nRespon: {msg}", parent=self)
+                    messagebox.showinfo("Tes Koneksi Sukses", f"Sinyal {cam_label} DITEMUKAN & AKTIF (200 OK)!\n\nURL: {url}\nRespon: {msg}", parent=self)
                 else:
-                    self.lbl_scan_indicator.config(text=f"{cam_label} Gagal: Kamera tidak merespons ({msg})", fg="#f87171")
-                    messagebox.showerror("Gagal Terhubung", f"Gagal menghubungi {cam_label}!\n\nURL: {url}\nStatus: {msg}", parent=self)
+                    self.lbl_scan_indicator.config(text=f"{cam_label} Gagal: {msg}", fg="#f87171")
+                    messagebox.showerror(
+                        "Gagal Terhubung",
+                        f"Gagal menghubungi {cam_label}!\n\nURL: {url}\nStatus: {msg}\n\n"
+                        "Tips Perbaikan:\n"
+                        "1. Periksa username dan password kamera di kolom atas.\n"
+                        "2. Jalur RTSP mungkin berbeda (coba klik Pindai Otomatis).\n"
+                        "3. Pastikan port RTSP (554) terbuka pada router / kamera.",
+                        parent=self
+                    )
             self.after(0, _finish)
 
         threading.Thread(target=_do_test, daemon=True).start()
@@ -676,7 +684,12 @@ class SettingsDialog(tk.Toplevel):
         for i, cam in enumerate(cams):
             ip = cam["ip"]
             name = cam.get("name", f"Kamera {ip}")
-            verified_tag = "[OK] Tervalidasi" if cam.get("verified") else "RTSP Terbuka"
+            if cam.get("verified"):
+                verified_tag = "[OK] Siap Tayang"
+            elif cam.get("needs_auth"):
+                verified_tag = "[!] Butuh Password"
+            else:
+                verified_tag = "RTSP Terbuka"
             
             row = tk.Frame(self.f_discovered_list, bg="#0f172a", pady=2)
             row.pack(fill="x")

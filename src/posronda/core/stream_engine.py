@@ -7,17 +7,14 @@ import os
 import sys
 import shutil
 
-# Standar Industri RTSP Capture: TCP, No-Buffer, Low-Delay, 1MB Socket Buffer, 5s Timeout (Anti-Freeze & Anti-Choke)
+# Standar Industri RTSP Capture: TCP, No-Buffer, Low-Delay, 1MB Socket Buffer, 10s Timeout (Anti-Freeze & Anti-Choke)
 # SANGAT PENTING: Harus disetel SEBELUM 'import cv2' dimuat ke memori!
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
     "rtsp_transport;tcp|"
     "fflags;nobuffer|"
-    "flags;low_delay|"
-    "framedrop;1|"
     "max_delay;500000|"
     "reorder_queue_size;0|"
-    "stimeout;5000000|"
-    "timeout;5000000|"
+    "stimeout;10000000|"
     "buffer_size;1048576"
 )
 
@@ -144,7 +141,8 @@ class RTSPCameraWorker(threading.Thread):
 
     def run(self):
         while self.running:
-            if not self.rtsp_url or not self.rtsp_url.startswith("rtsp://"):
+            url = self.rtsp_url.strip() if self.rtsp_url else ""
+            if not url or not url.startswith("rtsp://"):
                 self.status = "URL Belum Disetel"
                 self.current_frame = self._generate_placeholder("URL Kosong")
                 time.sleep(2)
@@ -153,13 +151,18 @@ class RTSPCameraWorker(threading.Thread):
             self.status = "Menyambungkan..."
             self.current_frame = self._generate_placeholder("Menghubungkan...")
 
-            cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             if not cap.isOpened():
                 self.failed_connects += 1
                 self.status = f"Gagal Konek ({self.failed_connects}x)"
-                self.current_frame = self._generate_placeholder("Gagal Terhubung (Retry...)")
+                self.current_frame = self._generate_placeholder(f"Gagal Terhubung ({self.failed_connects}x)")
+
+                # Auto-Heal: Jika gagal konek 3x atau 6x, coba cari jalur RTSP yang benar secara mandiri
+                if self.failed_connects in (3, 6):
+                    self._auto_heal_rtsp_path()
+
                 time.sleep(2)
                 continue
 
@@ -177,7 +180,8 @@ class RTSPCameraWorker(threading.Thread):
                 now = time.time()
 
                 if not ret or frame is None:
-                    if now - self.last_frame_time > 3.0:
+                    # Berikan waktu hingga 8 detik agar kamera dengan interval I-frame panjang (GOP 4-5s) tidak terputus prematur
+                    if now - self.last_frame_time > 8.0:
                         self.status = "Kamera Putus (Reconnecting...)"
                         self.current_frame = self._generate_placeholder("Koneksi Hilang...")
                         break
@@ -212,6 +216,30 @@ class RTSPCameraWorker(threading.Thread):
                 continue
             time.sleep(1.0)
 
+    def _auto_heal_rtsp_path(self):
+        """
+        Jika URL RTSP gagal terhubung berulang kali (misal akibat salah tebak /live/ch0),
+        secara otomatis memindai port RTSP kamera untuk mencari jalur asli (Hikvision, Dahua, Tapo, dll).
+        """
+        try:
+            try:
+                from posronda.network import onvif_scanner
+            except ImportError:
+                import onvif_scanner
+
+            ip = onvif_scanner.extract_ip(self.rtsp_url)
+            if not ip:
+                return
+            user, pwd, port, _ = onvif_scanner.extract_credentials_and_path(self.rtsp_url)
+            best_url, _, verified = onvif_scanner.find_best_rtsp_url(ip, port, user, pwd, probe=True)
+            if verified and best_url != self.rtsp_url:
+                print(f"[{self.name}] Auto-Heal: Memperbarui URL dari {self.rtsp_url} ke {best_url}")
+                self.rtsp_url = best_url
+                self.status = "Jalur Otomatis Diperbaiki..."
+                self.failed_connects = 0
+        except Exception as e:
+            print(f"[{self.name}] Auto-Heal error: {e}")
+
     def get_frame_direct(self, target_buf=None):
         """
         Atomic reference read tanpa mutex lock (zero lock contention).
@@ -226,7 +254,7 @@ class RTSPCameraWorker(threading.Thread):
                 if target_buf.shape == src.shape:
                     np.copyto(target_buf, src)
                 else:
-                    cv2.resize(src, (target_buf.shape[1], target_buf.shape[0]), dst=target_buf, interpolation=cv2.INTER_NEAREST)
+                    target_buf[:] = cv2.resize(src, (target_buf.shape[1], target_buf.shape[0]), interpolation=cv2.INTER_NEAREST)
             except Exception:
                 pass
             return target_buf
