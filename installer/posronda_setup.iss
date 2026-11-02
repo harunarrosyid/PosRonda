@@ -2,8 +2,10 @@
 ; Mendukung Pemasangan Dwibahasa & Manajemen Upgrade Versi (Timpa / Simpan Data / Instal Bersih / Copot)
 
 #ifndef MyAppVersion
-#define MyAppVersion "4.4.0"
+#define MyAppVersion "4.4.1"
 #endif
+
+#define MyAppId "{8F322987-9483-4DF1-A79B-83F67B549821}"
 
 [Setup]
 AppId={{8F322987-9483-4DF1-A79B-83F67B549821}}
@@ -26,7 +28,7 @@ DisableWelcomePage=no
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 CloseApplications=yes
-CloseApplicationsFilter=PosRonda.exe,PosRonda-Full.exe,PosRonda-Lite.exe
+CloseApplicationsFilter=*.exe,*.dll
 
 [Languages]
 Name: "id"; MessagesFile: "Indonesian.isl"
@@ -80,10 +82,19 @@ var
   sUnInstPath: String;
   sUnInstallString: String;
 begin
-  sUnInstPath := ExpandConstant('Software\Microsoft\Windows\CurrentVersion\Uninstall\{#emit SetupSetting("AppId")}_is1');
+  sUnInstPath := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppId}_is1';
   sUnInstallString := '';
   if not RegQueryStringValue(HKLM, sUnInstPath, 'UninstallString', sUnInstallString) then
-    RegQueryStringValue(HKCU, sUnInstPath, 'UninstallString', sUnInstallString);
+  begin
+    if not RegQueryStringValue(HKCU, sUnInstPath, 'UninstallString', sUnInstallString) then
+    begin
+      if IsWin64() then
+      begin
+        if not RegQueryStringValue(HKLM64, sUnInstPath, 'UninstallString', sUnInstallString) then
+          RegQueryStringValue(HKCU64, sUnInstPath, 'UninstallString', sUnInstallString);
+      end;
+    end;
+  end;
   Result := sUnInstallString;
 end;
 
@@ -104,7 +115,7 @@ begin
   UpgradePage.Add(CustomMessage('UpgradeOptionKeepData'));
   UpgradePage.Add(CustomMessage('UpgradeOptionCleanInstall'));
   UpgradePage.Add(CustomMessage('UpgradeOptionUninstallOld'));
-  UpgradePage.Values[0] := True;
+  UpgradePage.SelectedValueIndex := 0;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -115,32 +126,32 @@ begin
     Result := False;
 end;
 
+function GetUpgradeChoice(): Integer;
+begin
+  if UpgradePage <> nil then
+    Result := UpgradePage.SelectedValueIndex
+  else
+    Result := 0;
+end;
+
 function ShouldInstallConfig(): Boolean;
 begin
-  // Jika instalasi baru, langsung pasang
-  if not IsUpgrade() then
+  // Jika file config.json di folder target belum ada, wajib dipasang
+  if not FileExists(ExpandConstant('{app}\config.json')) then
   begin
     Result := True;
     Exit;
   end;
 
-  // Jika upgrade dan pengguna memilih Clean Install (Index 1)
-  if UpgradePage.Values[1] then
+  // Jika file config.json sudah ada:
+  // Pilihan 0 (Keep Data): jangan timpa config.json pengguna
+  if IsUpgrade() and (GetUpgradeChoice() = 0) then
   begin
-    // Cadangkan file lama terlebih dahulu
-    if FileExists(ExpandConstant('{app}\config.json')) then
-      RenameFile(ExpandConstant('{app}\config.json'), ExpandConstant('{app}\config.backup.json'));
-    Result := True;
+    Result := False;
     Exit;
   end;
 
-  // Jika pengguna memilih Keep Data (Index 0): jangan timpa jika sudah ada
-  if UpgradePage.Values[0] then
-  begin
-    Result := not FileExists(ExpandConstant('{app}\config.json'));
-    Exit;
-  end;
-
+  // Pilihan 1 (Clean Install) atau Pilihan 2 (Uninstall Old): pasang baru
   Result := True;
 end;
 
@@ -148,13 +159,32 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
   UninstCmd: String;
+  OldConfig: String;
+  BackupConfig: String;
 begin
-  if (CurStep = ssInstall) and IsUpgrade() and (UpgradePage <> nil) and UpgradePage.Values[2] then
+  if (CurStep = ssInstall) and IsUpgrade() then
   begin
-    UninstCmd := RemoveQuotes(GetUninstallString());
-    if FileExists(UninstCmd) then
+    // Opsi 2: Copot pemasangan versi lama terlebih dahulu
+    if GetUpgradeChoice() = 2 then
     begin
-      Exec(UninstCmd, '/SILENT /NORESTART', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);
+      UninstCmd := RemoveQuotes(GetUninstallString());
+      if (UninstCmd <> '') and FileExists(UninstCmd) then
+      begin
+        Exec(UninstCmd, '/SILENT /NORESTART /SUPPRESSMSGBOXES', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end;
+    end;
+
+    // Opsi 1: Instal ulang bersih (Backup config lama lalu buat baru)
+    if GetUpgradeChoice() = 1 then
+    begin
+      OldConfig := ExpandConstant('{app}\config.json');
+      BackupConfig := ExpandConstant('{app}\config.backup.json');
+      if FileExists(OldConfig) then
+      begin
+        if FileExists(BackupConfig) then
+          DeleteFile(BackupConfig);
+        RenameFile(OldConfig, BackupConfig);
+      end;
     end;
   end;
 end;

@@ -55,7 +55,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.0"
+    __version__ = "4.4.1"
 
 class CCTVApp:
     def __init__(self, root):
