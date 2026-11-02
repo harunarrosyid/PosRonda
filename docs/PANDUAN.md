@@ -1,4 +1,4 @@
-# Panduan Penggunaan: PosRonda v4.0
+# Panduan Penggunaan: PosRonda v4.1
 
 Dokumentasi penggunaan dan konfigurasi aplikasi pemantau CCTV multi-kamera PosRonda.
 
@@ -45,6 +45,7 @@ Aplikasi mendukung pemantauan lebih dari 4 kamera (hingga 16 kamera):
 | **`F5`** | Memulai ulang siaran streaming / sesi perekaman |
 | **`F6`** | Menjeda atau melanjutkan siaran |
 | **`F7`** | Mengakhiri atau memulai streaming / perekaman |
+| **`F9`** | Beralih antara **Mode Hemat (1 FPS GUI)** & **Mode Studio (Full)** |
 | **`Double-Click`** | Merefresh dan menyambungkan ulang feed kamera pada kuadran yang dipilih |
 | **`ESC`** | Keluar dari layar penuh |
 

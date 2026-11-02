@@ -3,7 +3,6 @@ name: Build PosRonda Windows EXE
 on:
   push:
     branches: [ main, master ]
-    tags: [ 'v*' ]
   workflow_dispatch:
 
 permissions:
@@ -24,18 +23,25 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
 
-    - name: 3. Install Dependencies & Build Tools
+    - name: 3. Detect App Version
+      shell: pwsh
+      run: |
+        $ver = (python -c "import sys; sys.path.insert(0, 'src'); import posronda; print(posronda.__version__)").Trim()
+        Write-Host "Detected PosRonda Version: $ver"
+        "APP_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: 4. Install Dependencies & Build Tools
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: 4. Compile Extensions with Cython
+    - name: 5. Compile Extensions with Cython
       run: |
         python setup_cython.py build_ext --inplace
         dir src\posronda\core\*.pyd
 
-    - name: 5. Build PosRonda-Lite.exe
+    - name: 6. Build PosRonda-Lite.exe
       shell: pwsh
       run: |
         Write-Host "===> Membangun PosRonda Lite Edition (Tanpa FFmpeg internal)..."
@@ -48,7 +54,7 @@ jobs:
           exit 1
         }
 
-    - name: 6. Download Official FFmpeg for Full Edition
+    - name: 7. Download Official FFmpeg for Full Edition
       shell: pwsh
       run: |
         Write-Host "===> Mengunduh FFmpeg resmi dengan dukungan Intel QuickSync..."
@@ -65,7 +71,7 @@ jobs:
         }
         Remove-Item -Recurse -Force "ffmpeg.zip", "ff_temp"
 
-    - name: 7. Build PosRonda-Full.exe
+    - name: 8. Build PosRonda-Full.exe
       shell: pwsh
       run: |
         Write-Host "===> Membangun PosRonda Full Edition (Dengan FFmpeg terintegrasi)..."
@@ -78,46 +84,47 @@ jobs:
           exit 1
         }
 
-    - name: 8. Package Release ZIP Archives
+    - name: 9. Package Release ZIP Archives
       shell: pwsh
       run: |
-        Write-Host "===> Mengemas Paket Full Edition..."
+        Write-Host "===> Mengemas Paket Full Edition (v$($env:APP_VERSION))..."
         New-Item -ItemType Directory -Force -Path pkg-full
         Copy-Item dist\PosRonda-Full.exe -Destination pkg-full\PosRonda.exe
         Copy-Item ffmpeg.exe -Destination pkg-full\
         Copy-Item config.json -Destination pkg-full\
         Copy-Item docs\PANDUAN.md -Destination pkg-full\
-        Compress-Archive -Path pkg-full\* -DestinationPath PosRonda-v4.0.0-Full.zip -Force
+        Compress-Archive -Path pkg-full\* -DestinationPath "PosRonda-v$($env:APP_VERSION)-Full.zip" -Force
 
-        Write-Host "===> Mengemas Paket Lite Edition..."
+        Write-Host "===> Mengemas Paket Lite Edition (v$($env:APP_VERSION))..."
         New-Item -ItemType Directory -Force -Path pkg-lite
         Copy-Item dist\PosRonda-Lite.exe -Destination pkg-lite\PosRonda.exe
         Copy-Item config.json -Destination pkg-lite\
         Copy-Item docs\PANDUAN.md -Destination pkg-lite\
-        Compress-Archive -Path pkg-lite\* -DestinationPath PosRonda-v4.0.0-Lite.zip -Force
+        Compress-Archive -Path pkg-lite\* -DestinationPath "PosRonda-v$($env:APP_VERSION)-Lite.zip" -Force
 
-    - name: 9. Upload Build Artifacts
+    - name: 10. Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: PosRonda-Windows-v4.0
+        name: PosRonda-Windows-v${{ env.APP_VERSION }}
         path: |
           dist/PosRonda-Full.exe
           dist/PosRonda-Lite.exe
-          PosRonda-v4.0.0-Full.zip
-          PosRonda-v4.0.0-Lite.zip
+          PosRonda-v*.zip
           config.json
           docs/PANDUAN.md
         retention-days: 30
 
-    - name: 10. Publish GitHub Release
+    - name: 11. Publish GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v4.0.0
-        name: "PosRonda v4.0.0 (Windows Release)"
+        tag_name: v${{ env.APP_VERSION }}
+        name: "PosRonda v${{ env.APP_VERSION }} (Windows Release)"
+        prerelease: false
+        generate_release_notes: true
         body: |
-          ### PosRonda v4.0.0 - Surveillance Hub & Live Streaming Engine
+          ### PosRonda v${{ env.APP_VERSION }} - Surveillance Hub & Live Streaming Engine
 
-          Rilis resmi aplikasi PosRonda v4.0.0 untuk sistem operasi Windows 64-bit.
+          Rilis resmi aplikasi PosRonda v${{ env.APP_VERSION }} untuk sistem operasi Windows 64-bit.
           Tersedia dalam dua varian instalasi:
 
           ---
@@ -126,13 +133,13 @@ jobs:
 
           #### 1. PosRonda Full Edition (Rekomendasi Utama untuk Semua Pengguna)
           *Paket all-in-one tanpa instalasi dependensi tambahan. Python & FFmpeg sudah terintegrasi.*
-          - **[PosRonda-v4.0.0-Full.zip](https://github.com/harunarrosyid/PosRonda/releases/download/v4.0.0/PosRonda-v4.0.0-Full.zip)**: Paket ZIP lengkap berisi `PosRonda.exe`, `ffmpeg.exe`, `config.json`, dan `PANDUAN.md`.
-          - **[PosRonda-Full.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v4.0.0/PosRonda-Full.exe)**: Biner mandiri tunggal dengan FFmpeg terintegrasi di dalamnya.
+          - **[PosRonda-v${{ env.APP_VERSION }}-Full.zip](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-v${{ env.APP_VERSION }}-Full.zip)**: Paket ZIP lengkap berisi `PosRonda.exe`, `ffmpeg.exe`, `config.json`, dan `PANDUAN.md`.
+          - **[PosRonda-Full.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-Full.exe)**: Biner mandiri tunggal dengan FFmpeg terintegrasi di dalamnya.
 
           #### 2. PosRonda Lite Edition (Untuk Teknisi / Laptop dengan FFmpeg)
           *Ukuran unduhan lebih hemat (~99 MB) bagi laptop yang sudah terpasang FFmpeg di sistemnya.*
-          - **[PosRonda-v4.0.0-Lite.zip](https://github.com/harunarrosyid/PosRonda/releases/download/v4.0.0/PosRonda-v4.0.0-Lite.zip)**: Paket ZIP biner PosRonda ringan.
-          - **[PosRonda-Lite.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v4.0.0/PosRonda-Lite.exe)**: Biner mandiri Lite.
+          - **[PosRonda-v${{ env.APP_VERSION }}-Lite.zip](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-v${{ env.APP_VERSION }}-Lite.zip)**: Paket ZIP biner PosRonda ringan.
+          - **[PosRonda-Lite.exe](https://github.com/harunarrosyid/PosRonda/releases/download/v${{ env.APP_VERSION }}/PosRonda-Lite.exe)**: Biner mandiri Lite.
 
           ---
 
@@ -142,8 +149,7 @@ jobs:
             - Versi **Full**: Sudah mencakup FFmpeg resmi dengan akselerasi hardware Intel QuickSync (`h264_qsv`) dan `libx264`.
             - Versi **Lite**: Otomatis mendeteksi FFmpeg yang sudah ada di System PATH laptop Anda. Jika belum ada, Anda bisa memilih file `ffmpeg.exe` lewat tombol di aplikasi untuk disalin otomatis ke folder PosRonda.
         files: |
-          PosRonda-v4.0.0-Full.zip
-          PosRonda-v4.0.0-Lite.zip
+          PosRonda-v*.zip
           dist/PosRonda-Full.exe
           dist/PosRonda-Lite.exe
       env:

@@ -1,5 +1,5 @@
 """
-PosRonda v4.0 - Main Launcher
+PosRonda Hub - Main Launcher
 Autonomous CCTV Multi-Camera Hub & Streaming Engine
 """
 import sys

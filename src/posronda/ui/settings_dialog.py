@@ -58,10 +58,15 @@ except ImportError:
     except ImportError:
         YouTubeManager = None
 
+try:
+    from posronda import __version__
+except Exception:
+    __version__ = "4.1.0"
+
 class SettingsDialog(tk.Toplevel):
     def __init__(self, parent, config, on_save_callback, initial_tab=None):
         super().__init__(parent)
-        self.title("Pengaturan PosRonda v4.0 - Surveillance Hub Control Center")
+        self.title(f"Pengaturan PosRonda v{__version__} - Surveillance Hub Control Center")
         self.configure(bg="#0b0f19")
         self.transient(parent)
         self.grab_set()
@@ -96,7 +101,7 @@ class SettingsDialog(tk.Toplevel):
 
         lbl_app = tk.Label(
             f_title, 
-            text="🛡️ PosRonda v4.0", 
+            text=f"🛡️ PosRonda v{__version__}", 
             bg="#1e1b4b", fg="#818cf8", 
             font=("Segoe UI", 11, "bold"), 
             padx=8, pady=2
@@ -215,7 +220,7 @@ class SettingsDialog(tk.Toplevel):
 
         lbl_esc_hint = tk.Label(
             bottom_bar,
-            text="PosRonda v4.0",
+            text=f"PosRonda v{__version__}",
             bg="#0b0f19", fg="#64748b", font=("Segoe UI", 8)
         )
         lbl_esc_hint.pack(side="left")

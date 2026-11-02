@@ -52,10 +52,15 @@ except ImportError:
     from settings_dialog import SettingsDialog
     from notifier import TelegramNotifier
 
+try:
+    from posronda import __version__
+except Exception:
+    __version__ = "4.1.0"
+
 class CCTVApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("PosRonda v4.0 - Autonomous CCTV Multi-Camera Hub & Streaming Engine")
+        self.root.title(f"PosRonda v{__version__} - Autonomous CCTV Multi-Camera Hub & Streaming Engine")
         self.root.geometry("1280x720")
         self.root.configure(bg="#07090e")
 
@@ -97,7 +102,7 @@ class CCTVApp:
         # Kiri: Brand Pill, Live Indicator Pill, Spec Badge & Teks Status
         self.lbl_brand_badge = tk.Label(
             self.bottom_bar, 
-            text="🛡️ PosRonda v4.0", 
+            text=f"🛡️ PosRonda v{__version__}", 
             bg="#1e1b4b", 
             fg="#818cf8", 
             font=("Segoe UI", 9, "bold"),
@@ -1269,7 +1274,7 @@ class CCTVApp:
         f_card = tk.Frame(dlg, bg="#1e293b", padx=20, pady=18, highlightthickness=1, highlightbackground="#334155")
         f_card.pack(fill="both", expand=True, padx=16, pady=16)
 
-        tk.Label(f_card, text="PosRonda v4.0", bg="#1e293b", fg="#818cf8", font=("Segoe UI", 13, "bold")).pack(anchor="w")
+        tk.Label(f_card, text=f"PosRonda v{__version__}", bg="#1e293b", fg="#818cf8", font=("Segoe UI", 13, "bold")).pack(anchor="w")
         tk.Label(f_card, text="Aplikasi Pemantau CCTV Multi-Kamera & Live Streaming", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 10))
 
         # Status Lisensi Box

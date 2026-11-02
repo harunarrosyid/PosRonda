@@ -24,6 +24,13 @@ def get_base_dir():
 LICENSE_FILE = os.path.join(get_base_dir(), "posronda.lic")
 LICENSE_SECRET_SALT = "POSRONDA_SECURE_SALT_v4_2026_CORE"
 
+def _get_default_brand():
+    try:
+        from posronda import __version__
+        return f"PosRonda Hub v{__version__}"
+    except Exception:
+        return "PosRonda Hub"
+
 class LicenseManager:
     @staticmethod
     def get_license_info():
@@ -38,7 +45,7 @@ class LicenseManager:
                 "is_pro": False,
                 "holder": "Warga & Komunitas PosRonda",
                 "org": "Penggunaan Mandiri (Non-Komersial)",
-                "watermark_brand": "PosRonda Hub v4.0",
+                "watermark_brand": _get_default_brand(),
                 "white_label_enabled": False,
                 "status_text": "Aktif (Non-Komersial)"
             }
@@ -72,7 +79,7 @@ class LicenseManager:
                     "is_pro": False,
                     "holder": "Warga & Komunitas PosRonda",
                     "org": "Non-Komersial",
-                    "watermark_brand": "PosRonda Hub v4.0",
+                    "watermark_brand": _get_default_brand(),
                     "white_label_enabled": False,
                     "status_text": "Kunci lisensi tidak cocok. Berjalan dalam mode Komunitas."
                 }
@@ -83,7 +90,7 @@ class LicenseManager:
                 "is_pro": False,
                 "holder": "Warga & Komunitas PosRonda",
                 "org": "Non-Komersial",
-                "watermark_brand": "PosRonda Hub v4.0",
+                "watermark_brand": _get_default_brand(),
                 "white_label_enabled": False,
                 "status_text": "Aktif (Non-Komersial)"
             }

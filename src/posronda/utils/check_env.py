@@ -65,8 +65,12 @@ def open_url(url):
     webbrowser.open_new(url)
 
 def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
+    try:
+        from posronda import __version__
+    except Exception:
+        __version__ = "4.1.0"
     root = tk.Tk()
-    root.title("Pemeriksa Sistem - PosRonda v4.0")
+    root.title(f"Pemeriksa Sistem - PosRonda v{__version__}")
     root.resizable(False, False)
     root.configure(bg="#0b0f19")
 
