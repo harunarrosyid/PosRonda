@@ -19,7 +19,10 @@ SCOPES = [
 class YouTubeManager:
     def __init__(self, config):
         self.cfg = config.get("youtube_api", {})
-        import config_manager
+        try:
+            from posronda.core import config_manager
+        except ImportError:
+            import config_manager
         base_dir = config_manager.get_base_dir()
         secret_name = self.cfg.get("client_secrets_file", "client_secrets.json")
         self.client_secrets_file = secret_name if os.path.isabs(secret_name) else os.path.join(base_dir, secret_name)
@@ -73,7 +76,7 @@ class YouTubeManager:
         ch_resp = self.service.channels().list(part="snippet", mine=True).execute()
         items = ch_resp.get("items", [])
         if not items:
-            return False, "Kredensial valid, namun tidak ditemukan Channel YouTube aktif di akun ini."
+            return False, "Kredensial valid, namun tidak ditemukan Channel YouTube aktif di akun ini.", None
 
         channel_name = items[0]["snippet"]["title"]
         msg = f"✔ Berhasil terhubung ke Channel: '{channel_name}'"
@@ -94,7 +97,19 @@ class YouTubeManager:
         else:
             msg += "\nℹ️ Playlist ID kosong (Video tidak akan otomatis dimasukkan ke playlist)."
 
-        return True, msg
+        # 3. Coba deteksi stream key yang sudah ada di channel ini
+        stream_key = None
+        try:
+            s_resp = self.service.liveStreams().list(part="cdn,snippet", mine=True, maxResults=5).execute()
+            s_items = s_resp.get("items", [])
+            if s_items:
+                stream_key = s_items[0]["cdn"]["ingestionInfo"]["streamName"]
+                masked_key = stream_key[:4] + "****" if len(stream_key) > 4 else "****"
+                msg += f"\n✔ Stream Key YouTube terdeteksi: {masked_key}"
+        except Exception:
+            pass
+
+        return True, msg, stream_key
 
     def find_existing_upcoming_broadcast(self):
         """Mencari apakah sudah ada siaran 'upcoming' aktif milik CCTV Hub untuk digunakan kembali (Anti-Numpuk)"""

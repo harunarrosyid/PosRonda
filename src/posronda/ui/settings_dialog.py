@@ -18,19 +18,45 @@ Mendukung:
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
+import sys
 import requests
 import threading
 import time
 import re
 
+# Pastikan path submodul posronda selalu terdaftar di sys.path
+base_ui_dir = os.path.dirname(os.path.abspath(__file__))
+posronda_pkg_dir = os.path.abspath(os.path.join(base_ui_dir, ".."))
+for sub in ["core", "network", "ui", "utils"]:
+    sub_path = os.path.join(posronda_pkg_dir, sub)
+    if sub_path not in sys.path:
+        sys.path.insert(0, sub_path)
+
 try:
     from posronda.network import onvif_scanner
+except ImportError:
+    try:
+        import onvif_scanner
+    except ImportError:
+        onvif_scanner = None
+
+try:
     from posronda.core import config_manager
+except ImportError:
+    import config_manager
+
+try:
     from posronda.core.license_manager import LicenseManager
 except ImportError:
-    import onvif_scanner
-    import config_manager
     from license_manager import LicenseManager
+
+try:
+    from posronda.network.youtube_manager import YouTubeManager
+except ImportError:
+    try:
+        from youtube_manager import YouTubeManager
+    except ImportError:
+        YouTubeManager = None
 
 class SettingsDialog(tk.Toplevel):
     def __init__(self, parent, config, on_save_callback, initial_tab=None):
@@ -694,7 +720,8 @@ class SettingsDialog(tk.Toplevel):
         f_pr2.pack(fill="x", pady=4)
         tk.Label(f_pr2, text="Stream Key / Path:", bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 9), width=18, anchor="w").pack(side="left")
         self.ent_custom_key = tk.Entry(f_pr2, font=("Segoe UI", 9), width=45, bg="#0f172a", fg="#ffffff", insertbackground="#38bdf8")
-        self.ent_custom_key.insert(0, stream_cfg.get("stream_key", ""))
+        initial_custom_key = stream_cfg.get("custom_stream_key") or (stream_cfg.get("stream_key", "") if stream_cfg.get("mode") == "private_rtmp" else "")
+        self.ent_custom_key.insert(0, initial_custom_key)
         self.ent_custom_key.pack(side="left", padx=4)
 
         # 2. CARD PEREKAMAN LOKAL HDD / NAS (Offline Tanpa Internet)
@@ -852,7 +879,11 @@ class SettingsDialog(tk.Toplevel):
 
         def run_test():
             try:
-                from youtube_manager import YouTubeManager
+                try:
+                    from posronda.network.youtube_manager import YouTubeManager
+                except ImportError:
+                    from youtube_manager import YouTubeManager
+
                 temp_cfg = {
                     "youtube_api": {
                         "client_secrets_file": secret_file,
@@ -862,9 +893,20 @@ class SettingsDialog(tk.Toplevel):
                     }
                 }
                 yt = YouTubeManager(temp_cfg)
-                ok, message = yt.test_connection(playlist_id=playlist_id)
+                result = yt.test_connection(playlist_id=playlist_id)
+                if isinstance(result, tuple) and len(result) == 3:
+                    ok, message, detected_key = result
+                else:
+                    ok, message = result
+                    detected_key = None
+
                 if ok:
-                    self.after(0, lambda: messagebox.showinfo("Koneksi YouTube API Sukses", message, parent=self))
+                    def _on_success():
+                        if detected_key and not self.ent_stream_key.get().strip():
+                            self.ent_stream_key.delete(0, tk.END)
+                            self.ent_stream_key.insert(0, detected_key)
+                        messagebox.showinfo("Koneksi YouTube API Sukses", message, parent=self)
+                    self.after(0, _on_success)
                 else:
                     self.after(0, lambda: messagebox.showwarning("Peringatan YouTube API", message, parent=self))
             except Exception as e:
@@ -884,7 +926,11 @@ class SettingsDialog(tk.Toplevel):
 
         def run_cleanup():
             try:
-                from youtube_manager import YouTubeManager
+                try:
+                    from posronda.network.youtube_manager import YouTubeManager
+                except ImportError:
+                    from youtube_manager import YouTubeManager
+
                 yt = YouTubeManager(self.cfg)
                 ok, msg = yt.cleanup_all_upcoming()
                 self.after(0, lambda: messagebox.showinfo("Pembersihan Selesai", msg, parent=self))
@@ -904,7 +950,11 @@ class SettingsDialog(tk.Toplevel):
 
         def run_cleanup_live():
             try:
-                from youtube_manager import YouTubeManager
+                try:
+                    from posronda.network.youtube_manager import YouTubeManager
+                except ImportError:
+                    from youtube_manager import YouTubeManager
+
                 yt = YouTubeManager(self.cfg)
                 ok, msg = yt.cleanup_active_live_broadcasts(only_cctv_prefix=False)
                 self.after(0, lambda: messagebox.showinfo("Pembersihan Siaran Live Selesai", msg, parent=self))
@@ -1273,10 +1323,17 @@ class SettingsDialog(tk.Toplevel):
 
         self.cfg["streaming"]["mode"] = stream_mode
         self.cfg["streaming"]["custom_rtmp_url"] = self.ent_custom_rtmp.get().strip()
-        if hasattr(self, "ent_custom_key") and self.ent_custom_key.get().strip():
-            self.cfg["streaming"]["stream_key"] = self.ent_custom_key.get().strip()
+
+        # Simpan Stream Key sesuai mode yang sedang aktif tanpa saling menimpa
+        yt_stream_key = self.ent_stream_key.get().strip()
+        custom_stream_key = self.ent_custom_key.get().strip() if hasattr(self, "ent_custom_key") else ""
+        self.cfg["streaming"]["custom_stream_key"] = custom_stream_key
+
+        if stream_mode == "private_rtmp":
+            self.cfg["streaming"]["stream_key"] = custom_stream_key or yt_stream_key
         else:
-            self.cfg["streaming"]["stream_key"] = self.ent_stream_key.get().strip()
+            self.cfg["streaming"]["stream_key"] = yt_stream_key
+
         self.cfg["streaming"]["rtmp_server"] = self.ent_rtmp.get().strip()
 
         # Simpan Local Record

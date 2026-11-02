@@ -31,6 +31,12 @@ from PIL import Image, ImageTk
 import cv2
 import numpy as np
 
+base_pkg_dir = os.path.dirname(os.path.abspath(__file__))
+for sub in ["core", "network", "ui", "utils"]:
+    sub_path = os.path.join(base_pkg_dir, sub)
+    if os.path.exists(sub_path) and sub_path not in sys.path:
+        sys.path.insert(0, sub_path)
+
 try:
     from posronda.core import config_manager
     from posronda.core.license_manager import LicenseManager
