@@ -249,15 +249,6 @@ class YouTubeManager:
 
             broadcast_id = valid_item["id"]
 
-            # Otomatis bersihkan siaran-siaran upcoming menumpuk lainnya yang tersisa dari run sebelumnya
-            for other in matched:
-                if other["id"] != broadcast_id:
-                    try:
-                        self.service.liveBroadcasts().delete(id=other["id"]).execute()
-                        print(f"[YouTube API] Menghapus siaran upcoming menumpuk: {other['id']}")
-                    except Exception:
-                        pass
-
             return {
                 "broadcast_id": broadcast_id,
                 "stream_id": bs_id,
@@ -321,36 +312,7 @@ class YouTubeManager:
             return True, f"Berhasil menghapus {deleted_count} siaran 'Upcoming' yang menumpuk di YouTube Studio!", None
         except Exception as e:
             err_str = str(e)
-            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str or "403" in err_str:
-                # Coba metode alternatif: Cari melalui Video API (search.list untuk upcoming)
-                try:
-                    print("[YouTube API] Mencoba pembersihan upcoming melalui Video Search API...")
-                    s_resp = self.service.search().list(
-                        part="id,snippet",
-                        forMine=True,
-                        eventType="upcoming",
-                        type="video",
-                        maxResults=50
-                    ).execute()
-                    s_items = s_resp.get("items", [])
-                    if s_items:
-                        for s_item in s_items:
-                            vid_id = s_item["id"].get("videoId")
-                            v_title = s_item.get("snippet", {}).get("title", "")
-                            if only_cctv_prefix and self.title_prefix.lower() not in v_title.lower():
-                                continue
-                            if vid_id:
-                                try:
-                                    self.service.videos().delete(id=vid_id).execute()
-                                    deleted_count += 1
-                                    print(f"[YouTube API] Terhapus upcoming video: {v_title} ({vid_id})")
-                                except Exception as de:
-                                    print(f"[YouTube API] Gagal hapus video {vid_id}: {de}")
-                        if deleted_count > 0:
-                            return True, f"Berhasil menghapus {deleted_count} siaran 'Upcoming' via Video API!", None
-                except Exception as fe:
-                    print(f"[YouTube API] Fallback Video Search API gagal: {fe}")
-
+            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
                 return False, (
                     "Fitur Live Streaming belum aktif pada Channel YouTube Anda di YouTube Studio (Error 403 liveStreamingNotEnabled).\n\n"
                     "Langkah aktivasi:\n"
@@ -358,6 +320,11 @@ class YouTubeManager:
                     "2. Klik 'Create' (Buat) -> 'Go Live' (Mulai Siaran Langsung)\n"
                     "3. Lakukan verifikasi nomor HP sesuai instruksi YouTube\n"
                     "4. Tunggu masa aktivasi hingga 24 jam sampai YouTube mengaktifkan fitur live streaming untuk channel Anda."
+                ), err_str
+            elif "quotaExceeded" in err_str or "quota" in err_str.lower():
+                return False, (
+                    "Batas kuota harian (10.000 unit) YouTube Data API telah habis untuk hari ini (Error 403 quotaExceeded).\n\n"
+                    "Tips: Gunakan Stream Key manual dari YouTube Studio untuk siaran langsung bebas kuota 24 jam."
                 ), err_str
 
             return False, f"Terjadi kesalahan saat membersihkan siaran upcoming:\n{e}", err_str
@@ -439,21 +406,7 @@ class YouTubeManager:
             return True, f"Berhasil membersihkan: {' dan '.join(msg_parts)}.", None
         except Exception as e:
             err_str = str(e)
-            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str or "403" in err_str:
-                # Coba cari siaran live via Video search
-                try:
-                    s_resp = self.service.search().list(
-                        part="id,snippet",
-                        forMine=True,
-                        eventType="live",
-                        type="video",
-                        maxResults=25
-                    ).execute()
-                    if not s_resp.get("items"):
-                        return True, "Tidak ditemukan siaran live menggantung di channel Anda.", None
-                except Exception:
-                    pass
-
+            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
                 return False, (
                     "Fitur Live Streaming belum aktif pada Channel YouTube Anda di YouTube Studio (Error 403 liveStreamingNotEnabled).\n\n"
                     "Langkah aktivasi:\n"
@@ -462,32 +415,19 @@ class YouTubeManager:
                     "3. Lakukan verifikasi nomor HP yang diminta YouTube\n"
                     "4. Tunggu masa aktivasi hingga 24 jam agar YouTube mengaktifkan izin streaming."
                 ), err_str
+            elif "quotaExceeded" in err_str or "quota" in err_str.lower():
+                return False, (
+                    "Batas kuota harian (10.000 unit) YouTube Data API telah habis untuk hari ini (Error 403 quotaExceeded).\n\n"
+                    "Tips: Gunakan Stream Key manual dari YouTube Studio untuk siaran langsung bebas kuota 24 jam."
+                ), err_str
 
             print(f"[YouTube API] Error saat membersihkan siaran: {e}")
             return False, f"Terjadi kesalahan saat membersihkan siaran:\n{e}", err_str
 
     def create_broadcast_and_stream(self, custom_title=None, force_new=True):
-        """Membuat Live Broadcast baru di YouTube dan otomatis membersihkan siaran upcoming lama yang menumpuk"""
+        """Membuat Live Broadcast baru di YouTube (Dioptimasi hemat kuota API)"""
         if not self.service:
             self.authenticate()
-
-        # 1. Otomatis hapus siaran-siaran 'upcoming' sisa run sebelumnya agar tidak pernah menumpuk lagi!
-        try:
-            print("[YouTube API] Membersihkan sisa siaran upcoming lama...")
-            self.cleanup_all_upcoming(only_cctv_prefix=True)
-        except Exception as e:
-            print(f"[YouTube API] Info pembersihan sisa upcoming: {e}")
-
-        # 2. Mode Siaran Tunggal: Tutup SELURUH siaran LIVE lama yang menggantung (sisa mati lampu / disconnect)
-        # sehingga TIDAK PERNAH ADA 2 live streaming bersamaan di akun YouTube Anda!
-        if getattr(self, "single_stream_mode", True):
-            try:
-                print("[YouTube API] Single Stream Mode: Menutup seluruh siaran live lama yang masih menggantung...")
-                self.cleanup_active_live_broadcasts(only_cctv_prefix=False)
-                import time
-                time.sleep(2)
-            except Exception as e:
-                print(f"[YouTube API] Info penutupan siaran live aktif lama: {e}")
 
         now_local = datetime.datetime.now()
         now_utc = datetime.datetime.now(datetime.timezone.utc)
@@ -530,25 +470,44 @@ class YouTubeManager:
 
         broadcast_id = broadcast_resp["id"]
 
-        # 2. Buat Live Stream Ingestion (Stream Key)
-        stream_body = {
-            "snippet": {
-                "title": f"Stream Key untuk {title}"
-            },
-            "cdn": {
-                "frameRate": "variable",
-                "ingestionType": "rtmp",
-                "resolution": "variable"
-            }
-        }
-        stream_resp = self.service.liveStreams().insert(
-            part="snippet,cdn",
-            body=stream_body
-        ).execute()
+        # 2. Dapatkan atau Buat Live Stream Ingestion (Stream Key)
+        # Optimasi: Gunakan kembali stream ingestion yang sudah ada (hemat 50 unit kuota API!)
+        stream_id = None
+        stream_name = None
+        ingestion_address = None
 
-        stream_id = stream_resp["id"]
-        stream_name = stream_resp["cdn"]["ingestionInfo"]["streamName"] # Ini stream key
-        ingestion_address = stream_resp["cdn"]["ingestionInfo"]["ingestionAddress"]
+        try:
+            s_list = self.service.liveStreams().list(part="id,cdn", mine=True, maxResults=5).execute()
+            for s_item in s_list.get("items", []):
+                ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
+                if ing_info.get("streamName") and ing_info.get("ingestionAddress"):
+                    stream_id = s_item["id"]
+                    stream_name = ing_info["streamName"]
+                    ingestion_address = ing_info["ingestionAddress"]
+                    print(f"[YouTube API] Menggunakan Stream Ingestion yang sudah ada: {stream_id}")
+                    break
+        except Exception as le:
+            print(f"[YouTube API] Info cek stream existing: {le}")
+
+        if not stream_id:
+            stream_body = {
+                "snippet": {
+                    "title": f"Stream Key untuk {title}"
+                },
+                "cdn": {
+                    "frameRate": "variable",
+                    "ingestionType": "rtmp",
+                    "resolution": "variable"
+                }
+            }
+            stream_resp = self.service.liveStreams().insert(
+                part="snippet,cdn",
+                body=stream_body
+            ).execute()
+
+            stream_id = stream_resp["id"]
+            stream_name = stream_resp["cdn"]["ingestionInfo"]["streamName"]
+            ingestion_address = stream_resp["cdn"]["ingestionInfo"]["ingestionAddress"]
 
         # 3. Ikat (Bind) Broadcast ke Stream
         self.service.liveBroadcasts().bind(
@@ -590,15 +549,17 @@ class YouTubeManager:
         return self.service.playlistItems().insert(part="snippet", body=body).execute()
 
     def wait_for_stream_and_transition(self, broadcast_id, stream_id=None, on_live_callback=None, on_progress_callback=None, max_retries=30, delay=3):
-        """Memantau ingestion stream hingga aktif di YouTube, lalu mentransisikan status siaran dari Upcoming ke LIVE secara pasti"""
+        """Memantau ingestion stream hingga aktif di YouTube (Hemat kuota: transisi hanya dipanggil maksimal 1x jika auto-start belum aktif)"""
         if not self.service:
             self.authenticate()
 
         print(f"[YouTube API] Memantau status siaran (Broadcast: {broadcast_id})...")
+        transition_attempted = False
+
         for attempt in range(max_retries):
             time.sleep(delay)
             try:
-                # 1. Cek status broadcast saat ini
+                # 1. Cek status broadcast saat ini (hanya 1 unit kuota)
                 b_resp = self.service.liveBroadcasts().list(part="status", id=broadcast_id).execute()
                 b_items = b_resp.get("items", [])
                 if b_items:
@@ -618,23 +579,25 @@ class YouTubeManager:
                                 on_progress_callback("YouTube dalam status Testing -> Mengubah ke LIVE...")
                             except Exception:
                                 pass
-                        try:
-                            self.service.liveBroadcasts().transition(
-                                broadcastStatus="live",
-                                id=broadcast_id,
-                                part="status"
-                            ).execute()
-                            print(f"[YouTube API] Transisi dari testing ke LIVE berhasil!")
-                            if on_live_callback:
-                                try:
-                                    on_live_callback()
-                                except Exception as cbe:
-                                    print(f"[YouTube API Callback Error] {cbe}")
-                            return True
-                        except Exception as te:
-                            print(f"[YouTube API] Menunggu transisi testing -> live: {te}")
+                        if not transition_attempted:
+                            try:
+                                self.service.liveBroadcasts().transition(
+                                    broadcastStatus="live",
+                                    id=broadcast_id,
+                                    part="status"
+                                ).execute()
+                                transition_attempted = True
+                                print("[YouTube API] Transisi dari testing ke LIVE berhasil!")
+                                if on_live_callback:
+                                    try:
+                                        on_live_callback()
+                                    except Exception:
+                                        pass
+                                return True
+                            except Exception as te:
+                                print(f"[YouTube API] Menunggu transisi testing -> live: {te}")
 
-                # 2. Cek status ingestion stream dari FFmpeg
+                # 2. Cek status ingestion stream dari FFmpeg (hanya 1 unit kuota)
                 stream_active = False
                 if stream_id:
                     s_resp = self.service.liveStreams().list(part="status", id=stream_id).execute()
@@ -658,41 +621,33 @@ class YouTubeManager:
                 else:
                     stream_active = True
 
-                # 3. Jika stream sudah active atau sudah lewat percobaan ke-4, coba transisikan ke LIVE
-                if stream_active or attempt >= 4:
+                # 3. Karena enableAutoStart: True, YouTube otomatis LIVE saat data video masuk.
+                # Hanya jika stream_active sudah lama (attempt >= 8) dan belum live, lakukan transisi manual SEKALI SAJA!
+                if stream_active and attempt >= 8 and not transition_attempted:
+                    transition_attempted = True
                     try:
                         self.service.liveBroadcasts().transition(
                             broadcastStatus="live",
                             id=broadcast_id,
                             part="status"
                         ).execute()
-                        print(f"[YouTube API] SUKSES! Siaran {broadcast_id} resmi menjadi LIVE!")
+                        print(f"[YouTube API] Transisi manual ke LIVE berhasil dikirim!")
                         if on_live_callback:
                             try:
                                 on_live_callback()
-                            except Exception as cbe:
-                                print(f"[YouTube API Callback Error] {cbe}")
+                            except Exception:
+                                pass
                         return True
                     except Exception as te:
                         err_str = str(te).lower()
                         if "redundant" in err_str or "already" in err_str or "invalidtransition" in err_str:
-                            print(f"[YouTube API] Siaran sudah dalam status LIVE!")
+                            print("[YouTube API] Siaran sudah dalam status LIVE!")
                             if on_live_callback:
                                 try:
                                     on_live_callback()
                                 except Exception:
                                     pass
                             return True
-                        # Jika direct to live ditolak karena monitorStream, coba testing dulu
-                        try:
-                            self.service.liveBroadcasts().transition(
-                                broadcastStatus="testing",
-                                id=broadcast_id,
-                                part="status"
-                            ).execute()
-                            print(f"[YouTube API] Masuk testing, selanjutnya akan ke live...")
-                        except Exception:
-                            pass
             except Exception as e:
                 print(f"[YouTube API] Menunggu stream active: {e}")
 

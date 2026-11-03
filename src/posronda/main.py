@@ -52,7 +52,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.2"
+    __version__ = "4.4.3"
 
 class CCTVApp:
     def __init__(self, root):
@@ -543,8 +543,11 @@ class CCTVApp:
                 rtmp_url = stream_cfg.get("rtmp_server", "rtmp://a.rtmp.youtube.com/live2")
                 api_error = None
 
-                # Jika YouTube API Aktif: buat / hubungkan broadcast
-                if yt_cfg.get("enabled", False) and self.streaming_enabled:
+                now_ts = time.time()
+                api_backoff = getattr(self, "_api_quota_backoff_until", 0)
+
+                # Jika YouTube API Aktif & tidak sedang dalam masa backoff kuota (30 menit):
+                if yt_cfg.get("enabled", False) and self.streaming_enabled and now_ts >= api_backoff:
                     try:
                         try:
                             from posronda.network.youtube_manager import YouTubeManager
@@ -581,10 +584,17 @@ class CCTVApp:
                     except Exception as e:
                         api_error = str(e)
                         print(f"[YouTube API Error] {e}")
-                        if not stream_key:
-                            stream_key = stream_cfg.get("stream_key", "")
-                        if stream_key:
-                            self.update_status(f"YouTube API Error ({e}). Menggunakan Stream Key cadangan...", is_live=False)
+
+                        # Jika terjadi error kuota atau 403, terapkan backoff 30 menit agar tidak memboroskan kuota API
+                        err_str_l = api_error.lower()
+                        if "quota" in err_str_l or "exceed" in err_str_l or "403" in err_str_l:
+                            self._api_quota_backoff_until = time.time() + 1800
+
+                        # Fallback otomatis ke Stream Key manual jika sudah pernah disimpan
+                        fallback_key = stream_cfg.get("stream_key", "").strip()
+                        if fallback_key:
+                            stream_key = fallback_key
+                            self.update_status("YouTube API Error. Beralih otomatis ke Stream Key manual (Bebas Kuota)...", is_live=False)
 
                 if stream_key and self.streaming_enabled:
                     if self.pusher:
@@ -657,17 +667,17 @@ class CCTVApp:
                     wait_seconds = max((max_hours * 3600) - (lead_mins * 60), 60)
                 else:
                     if self.streaming_enabled:
-                        if api_error:
-                            if "403" in api_error or "exceed" in api_error.lower() or "quota" in api_error.lower():
-                                self.lbl_status_icon.config(text="[403] KUOTA API HABIS", bg="#451a03", fg="#f59e0b")
-                                self.lbl_status_text.config(text="Kuota harian YouTube API habis (Error 403). Buka [F2] lalu tempel Stream Key dari YouTube Studio agar langsung LIVE tanpa kuota!")
-                            else:
-                                self.lbl_status_icon.config(text="[ERROR] YOUTUBE API", bg="#450a0a", fg="#ef4444")
-                                self.lbl_status_text.config(text=f"Gagal buat siaran: {api_error}. Buka [F2] untuk Stream Key manual.")
-                        else:
-                            self.lbl_status_icon.config(text="[ERROR] STREAM KEY KOSONG", bg="#450a0a", fg="#ef4444")
-                            self.lbl_status_text.config(text="Stream Key kosong! Tekan [F2] untuk mengisi Stream Key YouTube Anda.")
-                    wait_seconds = 5
+                        err_tag, err_desc = self._parse_youtube_api_error(api_error)
+                        self.lbl_status_icon.config(text=f"[{err_tag}]", bg="#451a03", fg="#f59e0b")
+                        self.lbl_status_text.config(text=err_desc)
+
+                        # Hentikan loop aktif agar tidak membanjiri API atau CPU
+                        self.streaming_enabled = False
+                        self.is_streaming = False
+
+                        # Buka popup bantuan Stream Key agar pengguna dapat langsung siaran bebas kuota
+                        self.root.after(0, self._show_stream_key_fallback_dialog, api_error, err_desc)
+                    wait_seconds = 30
 
             # Tunggu dengan event interruptible (bisa dibangunkan seketika jika ada restart/stop/save)
             self.stream_trigger.clear()
@@ -774,6 +784,7 @@ class CCTVApp:
         self.streaming_enabled = True
         self.is_paused = False
         self.restart_requested = False
+        self._api_quota_backoff_until = 0
         self.stream_start_time = time.time()
         self.stream_trigger.set()
         self.update_status(f"Menghubungkan & memulai {mode_label}...", is_live=False)
@@ -1255,6 +1266,136 @@ class CCTVApp:
 
         dlg.after(50, _enforce_focus)
         dlg.after(200, _enforce_focus)
+
+    def _parse_youtube_api_error(self, err_str):
+        """Membedakan penyebab error YouTube API secara akurat agar pesan diagnostik tepat sasaran"""
+        if not err_str:
+            return "STREAM KEY KOSONG", "Stream Key belum diisi. Masukkan Stream Key YouTube Anda."
+        err_lower = str(err_str).lower()
+        if "livestreamingnotenabled" in err_lower or "the user is not enabled for live streaming" in err_lower:
+            return "403 LIVE BELUM AKTIF", "Fitur Live Streaming belum diaktifkan pada channel YouTube ini di YouTube Studio (perlu verifikasi nomor HP di studio.youtube.com, masa tunggu hingga 24 jam). Gunakan Stream Key manual di bawah untuk langsung LIVE sekarang."
+        elif "quotaexceeded" in err_lower or "quota" in err_lower:
+            return "403 KUOTA API HABIS", "Batas kuota harian (10.000 unit) Google Cloud Data API telah habis hari ini (reset pukul 14:00 WIB). Masukkan Stream Key dari YouTube Studio di bawah agar siaran langsung LIVE tanpa batas kuota!"
+        elif "accessnotconfigured" in err_lower:
+            return "403 API BELUM AKTIF", "Layanan YouTube Data API v3 belum diaktifkan di Google Cloud Console project Anda. Masukkan Stream Key manual di bawah untuk tetap siaran."
+        elif "invalid_grant" in err_lower or "token" in err_lower:
+            return "TOKEN EXPIRED", "Otorisasi akun Google kadaluarsa. Hubungkan ulang di menu Pengaturan [F2] atau gunakan Stream Key manual di bawah."
+        else:
+            return "YOUTUBE API ERROR", f"Gagal membuat siaran otomatis: {err_str}. Gunakan Stream Key manual di bawah."
+
+    def _show_stream_key_fallback_dialog(self, raw_error, error_desc):
+        """Dialog bantuan saat YouTube API bermasalah (403 Kuota / Izin), memungkinkan pengguna langsung LIVE bebas kuota via Stream Key"""
+        if getattr(self, "_stream_key_dialog_open", False):
+            return
+        self._stream_key_dialog_open = True
+
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Bantuan Siaran Langsung YouTube - PosRonda")
+        dlg.geometry("560x420")
+        dlg.resizable(False, False)
+        dlg.configure(bg="#0b0f19")
+        dlg.transient(self.root)
+        dlg.grab_set()
+
+        def _on_close():
+            self._stream_key_dialog_open = False
+            dlg.destroy()
+
+        dlg.protocol("WM_DELETE_WINDOW", _on_close)
+
+        # Header
+        f_header = tk.Frame(dlg, bg="#1e1b4b", padx=16, pady=12)
+        f_header.pack(fill="x")
+        tk.Label(f_header, text="Siaran Langsung YouTube Tanpa Kuota API", bg="#1e1b4b", fg="#818cf8", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        tk.Label(f_header, text="Gunakan Stream Key langsung dari YouTube Studio untuk siaran 24 jam bebas kuota Google.", bg="#1e1b4b", fg="#94a3b8", font=("Segoe UI", 8)).pack(anchor="w")
+
+        f_body = tk.Frame(dlg, bg="#0b0f19", padx=16, pady=12)
+        f_body.pack(fill="both", expand=True)
+
+        # Kotak Info Error
+        f_err_box = tk.Frame(f_body, bg="#1e293b", padx=12, pady=10, highlightthickness=1, highlightbackground="#475569")
+        f_err_box.pack(fill="x", pady=(0, 12))
+
+        tk.Label(f_err_box, text="Penyebab YouTube API Tidak Tersedia:", bg="#1e293b", fg="#fca5a5", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        lbl_msg = tk.Label(f_err_box, text=error_desc, bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 8), justify="left", wraplength=500)
+        lbl_msg.pack(anchor="w", pady=(2, 4))
+
+        # Petunjuk & Input Stream Key
+        tk.Label(
+            f_body, 
+            text="Solusi Cepat: Masukkan Stream Key Tetap / Reusable Anda\n"
+                 "(Dapatkan di: studio.youtube.com -> Go Live -> Salin 'Kunci Streaming / Stream Key')",
+            bg="#0b0f19", fg="#38bdf8", font=("Segoe UI", 8), justify="left"
+        ).pack(anchor="w", pady=(0, 6))
+
+        cur_key = self.cfg.get("streaming", {}).get("stream_key", "")
+        ent_key = tk.Entry(f_body, font=("Segoe UI", 10), bg="#1e293b", fg="#38bdf8", insertbackground="#38bdf8")
+        if cur_key:
+            ent_key.insert(0, cur_key)
+        ent_key.pack(fill="x", pady=(0, 14))
+        ent_key.focus_set()
+
+        # Action Buttons
+        f_btns = tk.Frame(f_body, bg="#0b0f19")
+        f_btns.pack(fill="x")
+
+        def _start_with_key():
+            new_key = ent_key.get().strip()
+            if not new_key:
+                messagebox.showwarning("Kunci Kosong", "Silakan tempelkan Stream Key YouTube Anda terlebih dahulu!", parent=dlg)
+                return
+            self.cfg.setdefault("streaming", {})["stream_key"] = new_key
+            config_manager.save_config(self.cfg)
+            self._stream_key_dialog_open = False
+            dlg.destroy()
+            self.streaming_enabled = True
+            self.is_paused = False
+            self.stream_trigger.set()
+            self.update_status("Memulai siaran langsung via Stream Key (Bebas Kuota API)...", is_live=False)
+
+        def _open_yt_studio():
+            webbrowser.open_new("https://studio.youtube.com/channel/live")
+
+        def _copy_error():
+            try:
+                dlg.clipboard_clear()
+                dlg.clipboard_append(str(raw_error))
+                dlg.update_idletasks()
+                btn_copy.config(text="Log Disalin!", bg="#16a34a")
+                dlg.after(2000, lambda: btn_copy.config(text="Salin Log Error", bg="#475569"))
+            except Exception:
+                pass
+
+        btn_go = tk.Button(
+            f_btns, text="Mulai Live Sekarang", bg="#15803d", fg="#ffffff",
+            activebackground="#16a34a", activeforeground="#ffffff",
+            font=("Segoe UI", 9, "bold"), relief="flat", padx=12, pady=6, cursor="hand2",
+            command=_start_with_key
+        )
+        btn_go.pack(side="left", padx=(0, 6))
+
+        btn_studio = tk.Button(
+            f_btns, text="Buka YouTube Studio", bg="#0284c7", fg="#ffffff",
+            activebackground="#0369a1", activeforeground="#ffffff",
+            font=("Segoe UI", 8), relief="flat", padx=10, pady=6, cursor="hand2",
+            command=_open_yt_studio
+        )
+        btn_studio.pack(side="left", padx=(0, 6))
+
+        btn_copy = tk.Button(
+            f_btns, text="Salin Log Error", bg="#475569", fg="#e2e8f0",
+            activebackground="#334155", activeforeground="#ffffff",
+            font=("Segoe UI", 8), relief="flat", padx=10, pady=6, cursor="hand2",
+            command=_copy_error
+        )
+        btn_copy.pack(side="left")
+
+        btn_cancel = tk.Button(
+            f_btns, text="Batal", bg="#334155", fg="#94a3b8",
+            relief="flat", font=("Segoe UI", 8), padx=10, pady=6, cursor="hand2",
+            command=_on_close
+        )
+        btn_cancel.pack(side="right")
 
     def open_about_dialog(self):
         lic = LicenseManager.get_license_info()
