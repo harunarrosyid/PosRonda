@@ -2,7 +2,7 @@
 ; Mendukung Pemasangan Dwibahasa & Manajemen Upgrade Versi (Timpa / Simpan Data / Instal Bersih / Copot)
 
 #ifndef MyAppVersion
-#define MyAppVersion "4.4.3"
+#define MyAppVersion "4.4.4"
 #endif
 
 #define MyAppId "{8F322987-9483-4DF1-A79B-83F67B549821}"

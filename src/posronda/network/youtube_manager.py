@@ -112,13 +112,14 @@ class YouTubeManager:
             err_str = str(se)
             if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
                 msg += (
-                    "\n\n[PERINGATAN PENTING] Fitur Live Streaming BELUM AKTIF pada Channel ini!"
-                    "\n   Google melaporkan izin live streaming belum terbuka untuk akun ini."
-                    "\n   Langkah Aktivasi:"
-                    "\n   1. Buka https://studio.youtube.com"
-                    "\n   2. Klik 'Create' (Buat) -> 'Go Live' (Mulai Siaran)"
-                    "\n   3. Lakukan verifikasi nomor HP yang diminta YouTube"
-                    "\n   4. Tunggu masa aktivasi hingga 24 jam dari pihak YouTube."
+                    "\n\n[INFO] Google API (liveStreams) mengembalikan 403 (liveStreamingNotEnabled)."
+                    "\n   Akses live streaming via API dibatasi oleh Google Cloud pada proyek ini."
+                    "\n   Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota."
+                )
+            elif "quotaExceeded" in err_str or "quota" in err_str.lower():
+                msg += (
+                    "\n\n[INFO] Batas kuota harian Google Data API telah habis."
+                    "\n   Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota."
                 )
 
         return True, msg, stream_key
@@ -314,17 +315,14 @@ class YouTubeManager:
             err_str = str(e)
             if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
                 return False, (
-                    "Fitur Live Streaming belum aktif pada Channel YouTube Anda di YouTube Studio (Error 403 liveStreamingNotEnabled).\n\n"
-                    "Langkah aktivasi:\n"
-                    "1. Buka https://studio.youtube.com\n"
-                    "2. Klik 'Create' (Buat) -> 'Go Live' (Mulai Siaran Langsung)\n"
-                    "3. Lakukan verifikasi nomor HP sesuai instruksi YouTube\n"
-                    "4. Tunggu masa aktivasi hingga 24 jam sampai YouTube mengaktifkan fitur live streaming untuk channel Anda."
+                    "Google Cloud menolak permintaan API liveBroadcasts (Error 403: liveStreamingNotEnabled).\n"
+                    "Proyek Google Cloud atau token OAuth ini tidak memiliki izin pengelolaan siaran via API.\n\n"
+                    "Catatan: Siaran langsung RTMP via Stream Key tetap dapat digunakan normal tanpa batas kuota/API."
                 ), err_str
             elif "quotaExceeded" in err_str or "quota" in err_str.lower():
                 return False, (
                     "Batas kuota harian (10.000 unit) YouTube Data API telah habis untuk hari ini (Error 403 quotaExceeded).\n\n"
-                    "Tips: Gunakan Stream Key manual dari YouTube Studio untuk siaran langsung bebas kuota 24 jam."
+                    "Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota 24 jam."
                 ), err_str
 
             return False, f"Terjadi kesalahan saat membersihkan siaran upcoming:\n{e}", err_str
@@ -408,17 +406,14 @@ class YouTubeManager:
             err_str = str(e)
             if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
                 return False, (
-                    "Fitur Live Streaming belum aktif pada Channel YouTube Anda di YouTube Studio (Error 403 liveStreamingNotEnabled).\n\n"
-                    "Langkah aktivasi:\n"
-                    "1. Buka https://studio.youtube.com\n"
-                    "2. Klik 'Create' (Buat) -> 'Go Live' (Mulai Siaran Langsung)\n"
-                    "3. Lakukan verifikasi nomor HP yang diminta YouTube\n"
-                    "4. Tunggu masa aktivasi hingga 24 jam agar YouTube mengaktifkan izin streaming."
+                    "Google Cloud menolak permintaan API liveBroadcasts (Error 403: liveStreamingNotEnabled).\n"
+                    "Proyek Google Cloud atau token OAuth ini tidak memiliki izin pengelolaan siaran via API.\n\n"
+                    "Catatan: Siaran langsung RTMP via Stream Key tetap dapat digunakan normal tanpa batas kuota/API."
                 ), err_str
             elif "quotaExceeded" in err_str or "quota" in err_str.lower():
                 return False, (
                     "Batas kuota harian (10.000 unit) YouTube Data API telah habis untuk hari ini (Error 403 quotaExceeded).\n\n"
-                    "Tips: Gunakan Stream Key manual dari YouTube Studio untuk siaran langsung bebas kuota 24 jam."
+                    "Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota 24 jam."
                 ), err_str
 
             print(f"[YouTube API] Error saat membersihkan siaran: {e}")

@@ -860,7 +860,25 @@ class SettingsDialog(tk.Toplevel):
         self.ent_stream_key.insert(0, stream_cfg.get("stream_key", ""))
         self.ent_stream_key.pack(side="left", padx=(0, 4))
         self.btn_toggle_key = tk.Button(f_sk, text="Lihat", bg="#334155", fg="#cbd5e1", relief="flat", font=("Segoe UI", 8), command=self.toggle_stream_key_visibility)
-        self.btn_toggle_key.pack(side="left")
+        self.btn_toggle_key.pack(side="left", padx=(0, 4))
+
+        def _paste_stream_key():
+            try:
+                clip = self.clipboard_get().strip()
+                if clip:
+                    self.ent_stream_key.delete(0, tk.END)
+                    self.ent_stream_key.insert(0, clip)
+            except Exception:
+                pass
+
+        btn_paste_key = tk.Button(f_sk, text="Tempel", bg="#0284c7", fg="#ffffff", relief="flat", font=("Segoe UI", 8, "bold"), padx=6, cursor="hand2", command=_paste_stream_key)
+        btn_paste_key.pack(side="left")
+
+        tk.Label(
+            self.c_youtube,
+            text="Mode Standar (OBS): Tempel Stream Key YouTube Studio Anda di atas untuk siaran langsung 24 jam bebas kuota tanpa perlu akun/API Google Cloud.",
+            bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 8)
+        ).pack(anchor="w", pady=(1, 4))
 
         f_rtmp = tk.Frame(self.c_youtube, bg="#1e293b")
         f_rtmp.pack(fill="x", pady=3)
@@ -876,7 +894,7 @@ class SettingsDialog(tk.Toplevel):
         self.var_yt_enabled = tk.BooleanVar(value=yt_cfg.get("enabled", False))
         chk_api = tk.Checkbutton(
             f_api_box,
-            text="Aktifkan Otomasi YouTube API v3 (Auto Buat Broadcast & Masuk Playlist)",
+            text="Otomasi YouTube API v3 (Opsional: Auto Buat Jadwal & Masuk Playlist)",
             variable=self.var_yt_enabled,
             bg="#0f172a", fg="#ffffff", selectcolor="#1e293b",
             activebackground="#0f172a", activeforeground="#ffffff",

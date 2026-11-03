@@ -52,7 +52,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.3"
+    __version__ = "4.4.4"
 
 class CCTVApp:
     def __init__(self, root):
@@ -594,7 +594,7 @@ class CCTVApp:
                         fallback_key = stream_cfg.get("stream_key", "").strip()
                         if fallback_key:
                             stream_key = fallback_key
-                            self.update_status("YouTube API Error. Beralih otomatis ke Stream Key manual (Bebas Kuota)...", is_live=False)
+                            self.update_status("Beralih ke siaran langsung RTMP via Stream Key (Bebas Kuota API)...", is_live=False)
 
                 if stream_key and self.streaming_enabled:
                     if self.pusher:
@@ -631,53 +631,47 @@ class CCTVApp:
 
                     if not yt_cfg.get("enabled", False) or not self.current_broadcast:
                         self.is_streaming = True
-                        self.update_status(f"Streaming Manual ({actual_encoder} @ {fps}fps) -> YouTube (Mulai {start_clock} WIB)", is_live=True)
+                        self.update_status(f"Streaming RTMP ({actual_encoder} @ {fps}fps) -> YouTube (Mulai {start_clock} WIB)", is_live=True)
+                        wait_seconds = 86400
                     else:
                         self.is_streaming = False
                         self.lbl_status_icon.config(text=f"CONNECTING ({start_clock})", bg="#451a03", fg="#f59e0b")
                         self.lbl_status_text.config(text=f"Mengalirkan video ({actual_encoder}) ke YouTube, memverifikasi siaran...")
 
-                    if self.youtube_mgr and self.current_broadcast:
-                        b_id = self.current_broadcast.get("broadcast_id")
-                        s_id = self.current_broadcast.get("stream_id")
-                        def run_watcher():
-                            def on_live():
-                                def _apply_live():
-                                    self.is_streaming = True
-                                    start_str = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
-                                    if self.current_broadcast:
-                                        self.update_status(f"RESMI LIVE: {self.current_broadcast.get('title', '')} (Mulai {start_str} WIB)", is_live=True)
-                                self.root.after(0, _apply_live)
+                        if self.youtube_mgr and self.current_broadcast:
+                            b_id = self.current_broadcast.get("broadcast_id")
+                            s_id = self.current_broadcast.get("stream_id")
+                            def run_watcher():
+                                def on_live():
+                                    def _apply_live():
+                                        self.is_streaming = True
+                                        start_str = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
+                                        if self.current_broadcast:
+                                            self.update_status(f"RESMI LIVE: {self.current_broadcast.get('title', '')} (Mulai {start_str} WIB)", is_live=True)
+                                    self.root.after(0, _apply_live)
 
-                            def on_progress(msg):
-                                def _apply_prog():
-                                    self.lbl_status_text.config(text=msg)
-                                self.root.after(0, _apply_prog)
+                                def on_progress(msg):
+                                    def _apply_prog():
+                                        self.lbl_status_text.config(text=msg)
+                                    self.root.after(0, _apply_prog)
 
-                            if self.youtube_mgr:
-                                self.youtube_mgr.wait_for_stream_and_transition(
-                                    b_id, s_id, 
-                                    on_live_callback=on_live,
-                                    on_progress_callback=on_progress
-                                )
-                        threading.Thread(target=run_watcher, daemon=True).start()
+                                if self.youtube_mgr:
+                                    self.youtube_mgr.wait_for_stream_and_transition(
+                                        b_id, s_id, 
+                                        on_live_callback=on_live,
+                                        on_progress_callback=on_progress
+                                    )
+                            threading.Thread(target=run_watcher, daemon=True).start()
 
-                    max_hours = stream_cfg.get("max_duration_hours", 11)
-                    lead_mins = stream_cfg.get("rollover_lead_minutes", 5)
-                    wait_seconds = max((max_hours * 3600) - (lead_mins * 60), 60)
+                        max_hours = stream_cfg.get("max_duration_hours", 11)
+                        lead_mins = stream_cfg.get("rollover_lead_minutes", 5)
+                        wait_seconds = max((max_hours * 3600) - (lead_mins * 60), 60)
                 else:
                     if self.streaming_enabled:
                         err_tag, err_desc = self._parse_youtube_api_error(api_error)
                         self.lbl_status_icon.config(text=f"[{err_tag}]", bg="#451a03", fg="#f59e0b")
                         self.lbl_status_text.config(text=err_desc)
-
-                        # Hentikan loop aktif agar tidak membanjiri API atau CPU
-                        self.streaming_enabled = False
-                        self.is_streaming = False
-
-                        # Buka popup bantuan Stream Key agar pengguna dapat langsung siaran bebas kuota
-                        self.root.after(0, self._show_stream_key_fallback_dialog, api_error, err_desc)
-                    wait_seconds = 30
+                    wait_seconds = 10
 
             # Tunggu dengan event interruptible (bisa dibangunkan seketika jika ada restart/stop/save)
             self.stream_trigger.clear()
@@ -781,6 +775,21 @@ class CCTVApp:
         """Memulai kembali streaming / rekaman dari kondisi offline"""
         stream_mode = self.cfg.get("streaming", {}).get("mode", "youtube")
         mode_label = "Perekaman Lokal" if stream_mode == "local_recording" else ("Private Server" if stream_mode == "private_rtmp" else "YouTube")
+
+        # Jika mode YouTube dan stream key belum diatur:
+        if stream_mode == "youtube":
+            s_key = self.cfg.get("streaming", {}).get("stream_key", "").strip()
+            yt_api_on = self.cfg.get("youtube_api", {}).get("enabled", False)
+            if not s_key and not yt_api_on:
+                if messagebox.askyesno(
+                    "Stream Key YouTube Kosong",
+                    "Stream Key YouTube belum diatur di menu Pengaturan.\n\n"
+                    "Apakah Anda ingin membuka menu Pengaturan [F2] sekarang untuk memasukkan Stream Key?",
+                    parent=self.root
+                ):
+                    self.open_settings(initial_tab=1)
+                return
+
         self.streaming_enabled = True
         self.is_paused = False
         self.restart_requested = False
@@ -1268,23 +1277,23 @@ class CCTVApp:
         dlg.after(200, _enforce_focus)
 
     def _parse_youtube_api_error(self, err_str):
-        """Membedakan penyebab error YouTube API secara akurat agar pesan diagnostik tepat sasaran"""
+        """Membedakan penyebab error YouTube API secara akurat tanpa pesan menggurui"""
         if not err_str:
-            return "STREAM KEY KOSONG", "Stream Key belum diisi. Masukkan Stream Key YouTube Anda."
+            return "STREAM KEY KOSONG", "Stream Key YouTube belum diisi. Masukkan Stream Key di menu Pengaturan [F2] untuk mulai siaran."
         err_lower = str(err_str).lower()
         if "livestreamingnotenabled" in err_lower or "the user is not enabled for live streaming" in err_lower:
-            return "403 LIVE BELUM AKTIF", "Fitur Live Streaming belum diaktifkan pada channel YouTube ini di YouTube Studio (perlu verifikasi nomor HP di studio.youtube.com, masa tunggu hingga 24 jam). Gunakan Stream Key manual di bawah untuk langsung LIVE sekarang."
+            return "403 API RESTRICTED", "Akses liveBroadcasts API dibatasi oleh Google Cloud pada akun/proyek ini. Siaran langsung RTMP tetap berjalan normal menggunakan Stream Key YouTube di Pengaturan [F2]."
         elif "quotaexceeded" in err_lower or "quota" in err_lower:
-            return "403 KUOTA API HABIS", "Batas kuota harian (10.000 unit) Google Cloud Data API telah habis hari ini (reset pukul 14:00 WIB). Masukkan Stream Key dari YouTube Studio di bawah agar siaran langsung LIVE tanpa batas kuota!"
+            return "403 KUOTA API HABIS", "Kuota harian Google Data API telah habis. Siaran langsung RTMP tetap berjalan lancar bebas kuota menggunakan Stream Key YouTube di Pengaturan [F2]."
         elif "accessnotconfigured" in err_lower:
-            return "403 API BELUM AKTIF", "Layanan YouTube Data API v3 belum diaktifkan di Google Cloud Console project Anda. Masukkan Stream Key manual di bawah untuk tetap siaran."
+            return "403 API BELUM AKTIF", "Layanan YouTube Data API v3 belum diaktifkan di Google Cloud Console. Masukkan Stream Key di Pengaturan [F2] untuk siaran langsung RTMP."
         elif "invalid_grant" in err_lower or "token" in err_lower:
-            return "TOKEN EXPIRED", "Otorisasi akun Google kadaluarsa. Hubungkan ulang di menu Pengaturan [F2] atau gunakan Stream Key manual di bawah."
+            return "TOKEN EXPIRED", "Token autentikasi Google kadaluarsa. Hubungkan ulang di menu Pengaturan [F2] atau gunakan Stream Key YouTube."
         else:
-            return "YOUTUBE API ERROR", f"Gagal membuat siaran otomatis: {err_str}. Gunakan Stream Key manual di bawah."
+            return "YOUTUBE API ERROR", f"YouTube API: {err_str}. Masukkan Stream Key di Pengaturan [F2] untuk siaran langsung RTMP."
 
     def _show_stream_key_fallback_dialog(self, raw_error, error_desc):
-        """Dialog bantuan saat YouTube API bermasalah (403 Kuota / Izin), memungkinkan pengguna langsung LIVE bebas kuota via Stream Key"""
+        """Dialog bantuan saat YouTube API bermasalah (403 Kuota / Izin), non-modal agar tidak mengunci antarmuka"""
         if getattr(self, "_stream_key_dialog_open", False):
             return
         self._stream_key_dialog_open = True
@@ -1294,8 +1303,6 @@ class CCTVApp:
         dlg.geometry("560x420")
         dlg.resizable(False, False)
         dlg.configure(bg="#0b0f19")
-        dlg.transient(self.root)
-        dlg.grab_set()
 
         def _on_close():
             self._stream_key_dialog_open = False
@@ -1457,6 +1464,9 @@ class CCTVApp:
         def on_saved(new_cfg):
             self.cfg = new_cfg
             config_manager.save_config(new_cfg)
+            self.streaming_enabled = True
+            self.is_paused = False
+            self._api_quota_backoff_until = 0
             new_fps = new_cfg.get("streaming", {}).get("fps", 25)
             new_res = new_cfg.get("streaming", {}).get("grid_resolution", "1280x720")
             enc_lbl = "QSV GPU" if new_cfg.get("streaming", {}).get("encoder") == "h264_qsv" else "CPU"
