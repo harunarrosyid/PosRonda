@@ -1,21 +1,21 @@
 @echo off
-cd /d "%~dp0"
-title Update PosRonda Hub Otomatis
+cd /d "%~dp0\.."
+title Update Otomatis PosRonda Hub
 color 0B
 
 echo ========================================================
-echo        UPDATE OTOMATIS POSRONDA HUB v4.0
+echo        UPDATE OTOMATIS POSRONDA HUB v4.4.6
 echo ========================================================
 echo.
 
 set "ZIP_FILE="
-for /f "tokens=*" %%f in ('dir /b /o-d update_*.zip 2^>nul') do (
+for /f "tokens=*" %%f in ('dir /b /o-d update_cctv*.zip update_posronda*.zip update_*.zip 2^>nul') do (
     set "ZIP_FILE=%%f"
     goto found_zip
 )
 
 color 0C
-echo [ERROR] File zip update (seperti update_posronda_v4.0.zip atau update_cctv.zip) tidak ditemukan!
+echo [ERROR] File zip update (seperti update_cctv_v4.4.6.zip atau update_cctv.zip) tidak ditemukan!
 echo.
 echo Pastikan Anda sudah meletakkan file zip update ke dalam folder ini.
 echo.
@@ -23,7 +23,7 @@ pause
 exit /b 1
 
 :found_zip
-echo [✔] Berkas update terdeteksi: "%ZIP_FILE%"
+echo [OK] Berkas update terdeteksi: "%ZIP_FILE%"
 echo [1/2] Mengekstrak dan memperbarui file sistem PosRonda...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '.' -Force"
 
