@@ -874,6 +874,13 @@ class SettingsDialog(tk.Toplevel):
         btn_paste_key = tk.Button(f_sk, text="Tempel", bg="#0284c7", fg="#ffffff", relief="flat", font=("Segoe UI", 8, "bold"), padx=6, cursor="hand2", command=_paste_stream_key)
         btn_paste_key.pack(side="left")
 
+        btn_open_studio = tk.Button(
+            f_sk, text="Buka YouTube Studio", bg="#15803d", fg="#ffffff",
+            relief="flat", font=("Segoe UI", 8, "bold"), padx=8, cursor="hand2",
+            command=lambda: webbrowser.open_new("https://studio.youtube.com/channel/live")
+        )
+        btn_open_studio.pack(side="left", padx=(4, 0))
+
         tk.Label(
             self.c_youtube,
             text="Mode Standar (OBS): Tempel Stream Key YouTube Studio Anda di atas untuk siaran langsung 24 jam bebas kuota tanpa perlu akun/API Google Cloud.",
@@ -1181,7 +1188,13 @@ class SettingsDialog(tk.Toplevel):
     def cleanup_upcoming_broadcasts(self):
         secret_file = self.ent_secret.get().strip()
         if not secret_file or not os.path.exists(secret_file):
-            messagebox.showerror("File Tidak Ditemukan", f"File '{secret_file}' tidak ditemukan!", parent=self)
+            if messagebox.askyesno(
+                "Kelola di YouTube Studio",
+                "File kredensial Google API belum disiapkan.\n\n"
+                "Apakah Anda ingin membuka halaman 'Kelola Siaran' di YouTube Studio Web untuk menghapus siaran upcoming?",
+                parent=self
+            ):
+                webbrowser.open_new("https://studio.youtube.com/channel/live/manage")
             return
 
         if not messagebox.askyesno("Konfirmasi", "Hapus semua siaran 'Upcoming' yang menumpuk di channel?", parent=self):
@@ -1209,22 +1222,22 @@ class SettingsDialog(tk.Toplevel):
                 else:
                     self.after(0, lambda: show_error_dialog(
                         self,
-                        "Gagal Hapus Upcoming",
+                        "Kelola Siaran YouTube",
                         msg,
                         error_details=err_log or msg,
-                        action_url="https://studio.youtube.com",
-                        action_url_label="Buka YouTube Studio"
+                        action_url="https://studio.youtube.com/channel/live/manage",
+                        action_url_label="Buka Kelola Siaran di YouTube Studio"
                     ))
             except Exception as e:
                 import traceback
                 err_trace = traceback.format_exc()
                 self.after(0, lambda: show_error_dialog(
                     self,
-                    "Error Hapus Upcoming",
+                    "Kelola Siaran YouTube",
                     f"Terjadi kegagalan saat proses pembersihan upcoming:\n{e}",
                     error_details=err_trace,
-                    action_url="https://studio.youtube.com",
-                    action_url_label="Buka YouTube Studio"
+                    action_url="https://studio.youtube.com/channel/live/manage",
+                    action_url_label="Buka Kelola Siaran di YouTube Studio"
                 ))
 
         threading.Thread(target=run_cleanup, daemon=True).start()
@@ -1232,7 +1245,13 @@ class SettingsDialog(tk.Toplevel):
     def cleanup_active_broadcasts(self):
         secret_file = self.ent_secret.get().strip()
         if not os.path.exists(secret_file):
-            messagebox.showwarning("File Tidak Ditemukan", f"File '{secret_file}' tidak ditemukan!", parent=self)
+            if messagebox.askyesno(
+                "Kelola di YouTube Studio",
+                "File kredensial Google API belum disiapkan.\n\n"
+                "Apakah Anda ingin membuka halaman 'Kelola Siaran' di YouTube Studio Web untuk menutup siaran langsung?",
+                parent=self
+            ):
+                webbrowser.open_new("https://studio.youtube.com/channel/live/manage")
             return
 
         if not messagebox.askyesno("Konfirmasi", "Tutup seluruh siaran Live menggantung menjadi video arsip?", parent=self):
@@ -1260,11 +1279,11 @@ class SettingsDialog(tk.Toplevel):
                 else:
                     self.after(0, lambda: show_error_dialog(
                         self,
-                        "Gagal Tutup Siaran Zombie",
+                        "Kelola Siaran YouTube",
                         msg,
                         error_details=err_log or msg,
-                        action_url="https://studio.youtube.com",
-                        action_url_label="Buka YouTube Studio"
+                        action_url="https://studio.youtube.com/channel/live/manage",
+                        action_url_label="Buka Kelola Siaran di YouTube Studio"
                     ))
             except Exception as e:
                 import traceback

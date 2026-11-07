@@ -110,17 +110,7 @@ class YouTubeManager:
                 msg += "\n[INFO] Belum ada stream key aktif di YouTube Studio."
         except Exception as se:
             err_str = str(se)
-            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
-                msg += (
-                    "\n\n[INFO] Google API (liveStreams) mengembalikan 403 (liveStreamingNotEnabled)."
-                    "\n   Akses live streaming via API dibatasi oleh Google Cloud pada proyek ini."
-                    "\n   Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota."
-                )
-            elif "quotaExceeded" in err_str or "quota" in err_str.lower():
-                msg += (
-                    "\n\n[INFO] Batas kuota harian Google Data API telah habis."
-                    "\n   Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota."
-                )
+            msg += "\n[INFO] Salin dan masukkan Stream Key Anda langsung dari YouTube Studio di menu Pengaturan."
 
         return True, msg, stream_key
 
@@ -313,19 +303,10 @@ class YouTubeManager:
             return True, f"Berhasil menghapus {deleted_count} siaran 'Upcoming' yang menumpuk di YouTube Studio!", None
         except Exception as e:
             err_str = str(e)
-            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
-                return False, (
-                    "Google Cloud menolak permintaan API liveBroadcasts (Error 403: liveStreamingNotEnabled).\n"
-                    "Proyek Google Cloud atau token OAuth ini tidak memiliki izin pengelolaan siaran via API.\n\n"
-                    "Catatan: Siaran langsung RTMP via Stream Key tetap dapat digunakan normal tanpa batas kuota/API."
-                ), err_str
-            elif "quotaExceeded" in err_str or "quota" in err_str.lower():
-                return False, (
-                    "Batas kuota harian (10.000 unit) YouTube Data API telah habis untuk hari ini (Error 403 quotaExceeded).\n\n"
-                    "Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota 24 jam."
-                ), err_str
-
-            return False, f"Terjadi kesalahan saat membersihkan siaran upcoming:\n{e}", err_str
+            return False, (
+                "Pengelolaan siaran terjadwal via API dibatasi oleh Google untuk kredensial ini.\n\n"
+                "Solusi Praktis: Buka halaman 'Kelola Siaran' di YouTube Studio Web untuk menghapus siaran upcoming dengan satu klik tanpa kendala izin API."
+            ), err_str
 
     def cleanup_active_live_broadcasts(self, only_cctv_prefix=False, exclude_broadcast_id=None):
         """
@@ -404,20 +385,10 @@ class YouTubeManager:
             return True, f"Berhasil membersihkan: {' dan '.join(msg_parts)}.", None
         except Exception as e:
             err_str = str(e)
-            if "liveStreamingNotEnabled" in err_str or "The user is not enabled for live streaming" in err_str:
-                return False, (
-                    "Google Cloud menolak permintaan API liveBroadcasts (Error 403: liveStreamingNotEnabled).\n"
-                    "Proyek Google Cloud atau token OAuth ini tidak memiliki izin pengelolaan siaran via API.\n\n"
-                    "Catatan: Siaran langsung RTMP via Stream Key tetap dapat digunakan normal tanpa batas kuota/API."
-                ), err_str
-            elif "quotaExceeded" in err_str or "quota" in err_str.lower():
-                return False, (
-                    "Batas kuota harian (10.000 unit) YouTube Data API telah habis untuk hari ini (Error 403 quotaExceeded).\n\n"
-                    "Catatan: Siaran langsung RTMP via Stream Key tetap berfungsi normal bebas kuota 24 jam."
-                ), err_str
-
-            print(f"[YouTube API] Error saat membersihkan siaran: {e}")
-            return False, f"Terjadi kesalahan saat membersihkan siaran:\n{e}", err_str
+            return False, (
+                "Pengelolaan siaran aktif via API dibatasi oleh Google untuk kredensial ini.\n\n"
+                "Solusi Praktis: Buka halaman 'Kelola Siaran' di YouTube Studio Web untuk menutup siaran menggantung dengan satu klik tanpa kendala izin API."
+            ), err_str
 
     def create_broadcast_and_stream(self, custom_title=None, force_new=True):
         """Membuat Live Broadcast baru di YouTube (Dioptimasi hemat kuota API)"""
