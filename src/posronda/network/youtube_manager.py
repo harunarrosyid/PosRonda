@@ -4,12 +4,29 @@ Mengatur siklus live stream 11 jam, binding stream key, dan otomatis menambahkan
 """
 
 import os
+import sys
 import json
+import time
+import socket
 import datetime
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+
+def check_internet_connection(timeout=3.0):
+    """Mengecek apakah koneksi internet aktif (DNS probe cepat ke Cloudflare/Google DNS)."""
+    targets = [("1.1.1.1", 53), ("8.8.8.8", 53), ("www.google.com", 80)]
+    for host, port in targets:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            s.connect((host, port))
+            s.close()
+            return True
+        except Exception:
+            pass
+    return False
 
 SCOPES = [
     "https://www.googleapis.com/auth/youtube",
@@ -59,7 +76,10 @@ class YouTubeManager:
                         "Silakan unduh dari Google Cloud Console dan letakkan di folder aplikasi."
                     )
                 flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, SCOPES)
-                creds = flow.run_local_server(port=0)
+                try:
+                    creds = flow.run_local_server(port=0, prompt="consent select_account", access_type="offline")
+                except TypeError:
+                    creds = flow.run_local_server(port=0)
 
             with open(self.token_file, "w") as token:
                 token.write(creds.to_json())

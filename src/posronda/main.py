@@ -18,6 +18,8 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
 )
 
 import time
+import json
+import subprocess
 import threading
 import datetime
 import webbrowser
@@ -52,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.5"
+    __version__ = "4.4.6"
 
 class CCTVApp:
     def __init__(self, root):
@@ -413,12 +415,109 @@ class CCTVApp:
             else:
                 self.btn_page.config(text="Hal 1/1", state="disabled")
 
+    def _get_state_file_path(self):
+        try:
+            from posronda.core import config_manager
+            base_dir = config_manager.get_base_dir()
+        except Exception:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base_dir, "stream_state.json")
+
+    def _save_stream_state(self):
+        """Menyimpan informasi siaran aktif ke file agar tahan restart aplikasi (State Resume)"""
+        try:
+            if not self.current_broadcast:
+                return
+            state_file = self._get_state_file_path()
+            data = {
+                "broadcast_id": self.current_broadcast.get("broadcast_id"),
+                "stream_id": self.current_broadcast.get("stream_id"),
+                "stream_key": self.current_broadcast.get("stream_key"),
+                "rtmp_url": self.current_broadcast.get("rtmp_url"),
+                "title": self.current_broadcast.get("title"),
+                "stream_start_time": self.stream_start_time or time.time(),
+                "saved_at": time.time()
+            }
+            with open(state_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            print(f"[State] Status siaran aktif disimpan ke {state_file}")
+        except Exception as e:
+            print(f"[State] Gagal menyimpan stream_state.json: {e}")
+
+    def _load_stream_state(self):
+        """Membaca state siaran sebelumnya jika aplikasi baru saja me-restart"""
+        try:
+            state_file = self._get_state_file_path()
+            if os.path.exists(state_file):
+                with open(state_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return data
+        except Exception as e:
+            print(f"[State] Gagal membaca stream_state.json: {e}")
+        return None
+
+    def _clear_stream_state(self):
+        """Menghapus file state setelah siaran 11 jam selesai secara normal"""
+        try:
+            state_file = self._get_state_file_path()
+            if os.path.exists(state_file):
+                os.remove(state_file)
+                print(f"[State] File stream_state.json dibersihkan.")
+        except Exception:
+            pass
+
+    def _trigger_self_restart(self):
+        """
+        Graceful Self-Restart: Me-restart proses aplikasi secara mandiri untuk memulihkan
+        seluruh sumber daya sistem (Winsock, GPU driver, dan memori RAM) secara bersih.
+        """
+        print("[System] Menjalankan Graceful Self-Restart aplikasi PosRonda...")
+        if self.current_broadcast:
+            self._save_stream_state()
+
+        try:
+            if self.pusher:
+                self.pusher.stop()
+            if hasattr(self, "compositor") and self.compositor:
+                self.compositor.stop()
+            for cam in getattr(self, "cams", []):
+                try:
+                    cam.stop()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        base_dir = config_manager.get_base_dir()
+        launcher = os.path.join(base_dir, "run.py")
+        if not os.path.exists(launcher):
+            launcher = os.path.join(base_dir, "main.py")
+        if not os.path.exists(launcher):
+            launcher = sys.argv[0]
+
+        args = [sys.executable, launcher]
+        try:
+            if sys.platform == "win32":
+                c_flags = 0
+                if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+                    c_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+                if hasattr(subprocess, "DETACHED_PROCESS"):
+                    c_flags |= subprocess.DETACHED_PROCESS
+                subprocess.Popen(args, creationflags=c_flags, close_fds=True)
+            else:
+                subprocess.Popen(args)
+        except Exception as e:
+            print(f"[System] Gagal meluncurkan proses baru: {e}")
+
+        os._exit(0)
+
     def _youtube_lifecycle_loop(self):
         """
         Mengelola siklus transmisi video multi-tujuan:
-        1. Mode YouTube Live (Standar 11 jam & Auto Playlist)
+        1. Mode YouTube Live (Standar 11 jam, Auto-Rollover, Upcoming Cleanup, Auto-Playlist, & State Resume)
         2. Mode Private RTMP Server (MediaMTX / SRS / NGINX RTMP)
         3. Mode Perekaman Lokal HDD/NAS (Segmentasi MP4 & Auto-Pruning)
+        Dilengkapi Watchdog Heartbeat 1-detik anti-bengong & Self-Healing Auto-Restart.
         """
         force_fresh = False
         while True:
@@ -478,7 +577,7 @@ class CCTVApp:
                 start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time))
                 self.is_streaming = True
                 self.update_status(f"Perekaman Lokal Aktif ({actual_encoder}) -> {rec_dir}/ ({seg_mins}m per part | Auto-Delete {ret_days} hari | Mulai {start_clock} WIB)", is_live=True)
-                wait_seconds = 86400
+                target_limit_sec = 86400 * 365
 
             # ----------------------------------------------------
             # MODE 2: PRIVATE MEDIA SERVER / CUSTOM RTMP (Mode Mandiri)
@@ -527,16 +626,84 @@ class CCTVApp:
                 start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time))
                 self.is_streaming = True
                 self.update_status(f"Private Server Live ({actual_encoder}) -> {custom_url} (Mulai {start_clock} WIB)", is_live=True)
-                wait_seconds = 86400
+                target_limit_sec = 86400 * 365
 
             # ----------------------------------------------------
-            # MODE 3: YOUTUBE LIVE (Mode Direct RTMP - Bebas Kuota & Tanpa API)
+            # MODE 3: YOUTUBE LIVE (Auto 11 Jam & Playlist / RTMP Manual)
             # ----------------------------------------------------
             else:
+                yt_cfg = self.cfg.get("youtube_api", {})
                 stream_key = stream_cfg.get("stream_key", "").strip()
                 rtmp_url = stream_cfg.get("rtmp_server", "rtmp://a.rtmp.youtube.com/live2")
+                api_error = None
+                resumed_existing = False
 
-                # 1. JIKA STREAM KEY SUDAH ADA: LANGSUNG STREAMING RTMP (Sama seperti OBS)
+                # A. JIKA YOUTUBE API AKTIF: Otomasi Penuh (11 Jam, Cleanup, Playlist, State Resume)
+                if yt_cfg.get("enabled", False) and self.streaming_enabled:
+                    try:
+                        from posronda.network.youtube_manager import YouTubeManager
+                        if not self.youtube_mgr:
+                            self.youtube_mgr = YouTubeManager(self.cfg)
+                            self.youtube_mgr.authenticate()
+
+                        self.update_status("Menghubungkan ke YouTube Live API...", is_live=False)
+
+                        # 1. Coba pulihkan state siaran sebelumnya jika baru saja me-restart (State Resume)
+                        saved_state = self._load_stream_state()
+                        broadcast_info = None
+
+                        if saved_state and not force_fresh:
+                            saved_start = saved_state.get("stream_start_time", 0)
+                            max_h = stream_cfg.get("max_duration_hours", 11)
+                            lead_m = stream_cfg.get("rollover_lead_minutes", 5)
+                            max_sec = max((max_h * 3600) - (lead_m * 60), 60)
+                            elapsed_prev = time.time() - saved_start
+
+                            if 0 < elapsed_prev < max_sec:
+                                broadcast_info = saved_state
+                                self.stream_start_time = saved_start
+                                resumed_existing = True
+                                print(f"[YouTube API] State Resume: Melanjutkan siaran aktif '{broadcast_info.get('title')}' (Sudah berjalan {elapsed_prev/60:.1f} menit)")
+
+                        # 2. Jika tidak ada state resume, cari siaran upcoming yang sudah siap (Hemat kuota)
+                        if not broadcast_info and not force_fresh:
+                            try:
+                                broadcast_info = self.youtube_mgr.find_existing_upcoming_broadcast()
+                                if broadcast_info:
+                                    print(f"[YouTube API] Menggunakan siaran upcoming yang sudah siap: {broadcast_info['title']}")
+                            except Exception as fe:
+                                print(f"[YouTube API] Info cek upcoming: {fe}")
+
+                        # 3. Jika belum ada, buat siaran baru via API (membersihkan sisa upcoming lama)
+                        if not broadcast_info:
+                            broadcast_info = self.youtube_mgr.create_broadcast_and_stream(force_new=force_fresh)
+                            self.stream_start_time = time.time()
+
+                        force_fresh = False
+                        self.current_broadcast = broadcast_info
+                        stream_key = broadcast_info["stream_key"]
+                        rtmp_url = broadcast_info.get("rtmp_url", rtmp_url)
+
+                        # Simpan state siaran ke file agar tahan restart aplikasi
+                        self._save_stream_state()
+
+                        # Auto-cache stream_key ke config
+                        if stream_key and stream_key != stream_cfg.get("stream_key", ""):
+                            self.cfg["streaming"]["stream_key"] = stream_key
+                            config_manager.save_config(self.cfg)
+
+                        title_disp = broadcast_info.get('title', 'PosRonda Live')
+                        self.update_status(f"Siaran siap: {title_disp} (Menyiapkan encoder...)", is_live=False)
+
+                    except Exception as e:
+                        api_error = str(e)
+                        print(f"[YouTube API Error] {e}")
+                        if not stream_key:
+                            stream_key = stream_cfg.get("stream_key", "")
+                        if stream_key:
+                            self.update_status(f"YouTube API Error ({e}). Menggunakan Stream Key cadangan...", is_live=False)
+
+                # B. MULAI PUSHER FFMPEG KE YOUTUBE
                 if stream_key and self.streaming_enabled:
                     if self.pusher:
                         self.pusher.stop()
@@ -556,7 +723,6 @@ class CCTVApp:
                         self.compositor.update_settings(pusher=self.pusher, fps=fps, resolution=resolution)
 
                     started = self.pusher.start()
-
                     if not started or not self.pusher.running:
                         self.is_streaming = False
                         self.lbl_status_icon.config(text="[ERROR] ENCODER", bg="#450a0a", fg="#ef4444")
@@ -567,23 +733,140 @@ class CCTVApp:
 
                     actual_encoder = self.pusher.encoder
                     self.pusher_start_time = time.time()
-                    self.stream_start_time = time.time()
+                    if not resumed_existing or not self.stream_start_time:
+                        self.stream_start_time = time.time()
                     start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time))
 
-                    self.is_streaming = True
-                    self.update_status(f"Streaming RTMP ({actual_encoder} @ {fps}fps) -> YouTube (Mulai {start_clock} WIB)", is_live=True)
-                    wait_seconds = 86400
-                else:
-                    # 2. STREAM KEY BELUM DIISI: Tampilkan petunjuk ramah tanpa pernah memicu error API atau 403
-                    if self.streaming_enabled:
+                    if not yt_cfg.get("enabled", False):
+                        self.is_streaming = True
+                        self.update_status(f"Streaming RTMP Manual ({actual_encoder} @ {fps}fps) -> YouTube (Mulai {start_clock} WIB)", is_live=True)
+                    else:
                         self.is_streaming = False
-                        self.lbl_status_icon.config(text="[STANDBY]", bg="#1e293b", fg="#94a3b8")
-                        self.lbl_status_text.config(text="Stream Key YouTube belum diatur. Masukkan Stream Key di menu Pengaturan [F2].")
-                    wait_seconds = 10
+                        self.lbl_status_icon.config(text="CONNECTING", bg="#451a03", fg="#f59e0b")
+                        self.lbl_status_text.config(text=f"Mengalirkan video ({actual_encoder}) ke YouTube, memverifikasi siaran...")
 
-            # Tunggu dengan event interruptible (bisa dibangunkan seketika jika ada restart/stop/save)
-            self.stream_trigger.clear()
-            interrupted = self.stream_trigger.wait(timeout=wait_seconds)
+                        # Thread pemantau transisi live
+                        if self.youtube_mgr and self.current_broadcast:
+                            b_id = self.current_broadcast.get("broadcast_id")
+                            s_id = self.current_broadcast.get("stream_id")
+                            def run_watcher():
+                                def on_live():
+                                    def _apply_live():
+                                        self.is_streaming = True
+                                        start_str = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
+                                        if self.current_broadcast:
+                                            self.update_status(f"RESMI LIVE: {self.current_broadcast.get('title', '')} (Mulai {start_str} WIB)", is_live=True)
+                                    self.root.after(0, _apply_live)
+
+                                def on_progress(msg):
+                                    def _apply_prog():
+                                        self.lbl_status_text.config(text=msg)
+                                    self.root.after(0, _apply_prog)
+
+                                if self.youtube_mgr:
+                                    self.youtube_mgr.wait_for_stream_and_transition(
+                                        b_id, s_id,
+                                        on_live_callback=on_live,
+                                        on_progress_callback=on_progress
+                                    )
+                            threading.Thread(target=run_watcher, daemon=True).start()
+
+                    max_hours = stream_cfg.get("max_duration_hours", 11)
+                    lead_mins = stream_cfg.get("rollover_lead_minutes", 5)
+                    target_limit_sec = max((max_hours * 3600) - (lead_mins * 60), 60)
+                else:
+                    if self.streaming_enabled:
+                        if api_error:
+                            self.lbl_status_icon.config(text="API ERROR", bg="#450a0a", fg="#ef4444")
+                            self.lbl_status_text.config(text=f"Gagal buat siaran: {api_error}. Periksa kredensial YouTube API atau Stream Key.")
+                        else:
+                            self.lbl_status_icon.config(text="STREAM KEY KOSONG", bg="#450a0a", fg="#ef4444")
+                            self.lbl_status_text.config(text="Stream Key belum diatur. Tekan [F2] untuk mengisi Stream Key.")
+                    self.stream_trigger.clear()
+                    self.stream_trigger.wait(timeout=5)
+                    continue
+
+            # ----------------------------------------------------
+            # C. WATCHDOG HEARTBEAT LOOP (Anti-Bengong, Auto-Rollover 11 Jam, & Self-Healing)
+            # ----------------------------------------------------
+            consecutive_stream_drops = 0
+            while self.streaming_enabled and not self.restart_requested:
+                # 1. Cek Rollover Batas Waktu 11 Jam (Khusus YouTube dengan API)
+                if stream_mode == "youtube" and self.youtube_mgr and self.current_broadcast:
+                    now_elapsed = time.time() - (self.stream_start_time or time.time())
+                    if now_elapsed >= target_limit_sec:
+                        self.update_status(f"Batas {max_hours} jam tercapai. Menutup siaran lama & menyiapkan siaran baru...", is_live=False)
+                        old_id = self.current_broadcast.get("broadcast_id")
+                        try:
+                            self.youtube_mgr.end_broadcast(old_id)
+                        except Exception as ee:
+                            print(f"[YouTube API] Info penutupan siaran lama: {ee}")
+                        self._clear_stream_state()
+                        force_fresh = True
+                        break
+
+                # 2. Pemantau Kesehatan FFmpeg (Anti-Bengong Watchdog)
+                pusher_alive = bool(
+                    self.pusher and 
+                    getattr(self.pusher, "running", False) and 
+                    getattr(self.pusher, "process", None) is not None and 
+                    self.pusher.process.poll() is None
+                )
+
+                if not pusher_alive and self.streaming_enabled:
+                    consecutive_stream_drops += 1
+                    print(f"[Watchdog] Terdeteksi stream terputus! (Percobaan pemulihan {consecutive_stream_drops})")
+
+                    if consecutive_stream_drops <= 3:
+                        # TIER 1: Soft Recovery (In-process restart FFmpeg dalam 3 detik)
+                        self.update_status(f"[MENYAMBUNG ULANG] Terputus dari server, memulihkan stream ({consecutive_stream_drops}/3)...", is_live=False)
+                        if self.pusher:
+                            self.pusher.stop()
+                        time.sleep(3)
+
+                        self.pusher = FFmpegStreamPusher(
+                            rtmp_url=rtmp_url if stream_mode == "youtube" else (custom_url if stream_mode == "private_rtmp" else ""),
+                            stream_key=stream_key if stream_mode != "local_recording" else "",
+                            fps=fps,
+                            bitrate=bitrate,
+                            encoder=encoder,
+                            resolution=resolution,
+                            preset=preset,
+                            mode=stream_mode,
+                            custom_rtmp_url=custom_url if stream_mode == "private_rtmp" else "",
+                            local_output_dir=rec_dir if stream_mode == "local_recording" else "recordings",
+                            segment_minutes=seg_mins if stream_mode == "local_recording" else 15,
+                            retention_days=ret_days if stream_mode == "local_recording" else 14,
+                            external_driver=True
+                        )
+                        if hasattr(self, "compositor"):
+                            self.compositor.update_settings(pusher=self.pusher, fps=fps, resolution=resolution)
+
+                        if self.pusher.start():
+                            consecutive_stream_drops = 0
+                            self.update_status("Koneksi berhasil dipulihkan! Melanjutkan streaming...", is_live=True)
+                            continue
+                    else:
+                        # TIER 2 & 3: Cek Internet & Self-Restart
+                        from posronda.network.youtube_manager import check_internet_connection
+                        if not check_internet_connection():
+                            self.update_status("[INTERNET TERPUTUS] Menunggu koneksi internet aktif kembali...", is_live=False)
+                            time.sleep(10)
+                            continue
+                        else:
+                            # Internet aktif tapi stream macet berturut-turut: Trigger Self-Restart
+                            self.update_status("[AUTO-RESTART] Gangguan berulang terdeteksi, me-restart aplikasi dalam 3 detik...", is_live=False)
+                            time.sleep(2)
+                            self._trigger_self_restart()
+                            return
+                else:
+                    consecutive_stream_drops = 0
+
+                # Tunggu 1 detik dengan interruptible event trigger
+                self.stream_trigger.clear()
+                interrupted = self.stream_trigger.wait(timeout=1.0)
+                if interrupted:
+                    break
 
             if not self.streaming_enabled:
                 if self.pusher:
@@ -598,16 +881,13 @@ class CCTVApp:
                 if stream_mode == "youtube" and self.youtube_mgr and self.current_broadcast:
                     self.update_status("Menutup siaran lama untuk memulai siaran baru...", is_live=False)
                     old_id = self.current_broadcast.get("broadcast_id")
-                    self.youtube_mgr.end_broadcast(old_id)
+                    try:
+                        self.youtube_mgr.end_broadcast(old_id)
+                    except Exception:
+                        pass
+                self._clear_stream_state()
                 force_fresh = True
                 continue
-
-            # Jika waktu 11 jam habis secara normal (khusus mode YouTube dengan API):
-            if not interrupted and stream_mode == "youtube" and self.youtube_mgr and self.current_broadcast:
-                self.update_status("Batas 11 jam tercapai. Menutup siaran lama & menyiapkan siaran baru...", is_live=False)
-                old_id = self.current_broadcast.get("broadcast_id")
-                self.youtube_mgr.end_broadcast(old_id)
-                force_fresh = True
 
     def toggle_pause(self):
         """Menjeda atau melanjutkan push streaming / perekaman (F6)"""
@@ -942,6 +1222,11 @@ class CCTVApp:
                         self.lbl_status_icon.config(text="CONNECTING", bg="#451a03", fg="#f59e0b")
                         self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
                         self.btn_pause.config(state="disabled", text="Jeda (F6)", bg="#334155")
+            elif self.streaming_enabled:
+                # Pusher sedang down / dalam pemulihan watchdog: tampilkan status reconnecting aktif
+                self.lbl_status_icon.config(text="RECONNECTING", bg="#451a03", fg="#f59e0b")
+                self.btn_end.config(text="Akhiri (F7)", bg="#b91c1c", activebackground="#dc2626")
+                self.btn_pause.config(state="disabled", text="Jeda (F6)", bg="#334155")
         except Exception:
             pass
 

@@ -423,8 +423,9 @@ class FFmpegStreamPusher:
             try:
                 self.process.stdin.write(memoryview(out_frame))
                 return True
-            except (BrokenPipeError, OSError):
+            except (BrokenPipeError, OSError) as pe:
                 self.running = False
+                self.last_error = f"BrokenPipe: {pe}"
                 return False
         return False
 
@@ -433,6 +434,7 @@ class FFmpegStreamPusher:
         cmd = [
             ffmpeg_bin,
             "-y",
+            "-loglevel", "warning",
             "-fflags", "+nobuffer+genpts",
             "-flags", "+low_delay",
             "-f", "rawvideo",
@@ -486,6 +488,7 @@ class FFmpegStreamPusher:
                 "-g", str(self.fps * 2),
                 "-c:a", "aac",
                 "-b:a", "64k",
+                "-rw_timeout", "10000000",
                 "-f", "flv",
                 "-flvflags", "no_duration_filesize",
                 target
