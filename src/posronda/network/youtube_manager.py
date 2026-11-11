@@ -361,6 +361,30 @@ class YouTubeManager:
             print(f"[YouTube API] Error cek broadcast existing: {e}")
             return None
 
+    def get_broadcast_status(self, broadcast_id):
+        """Mengecek status siaran tertentu di YouTube (lifeCycleStatus, title, dsb)"""
+        if not self.service:
+            self.authenticate()
+        try:
+            resp = self.service.liveBroadcasts().list(
+                part="id,snippet,status",
+                id=broadcast_id
+            ).execute()
+            items = resp.get("items", [])
+            if items:
+                status_info = items[0].get("status", {})
+                snippet_info = items[0].get("snippet", {})
+                return {
+                    "id": items[0]["id"],
+                    "title": snippet_info.get("title", ""),
+                    "lifeCycleStatus": status_info.get("lifeCycleStatus"),
+                    "privacyStatus": status_info.get("privacyStatus")
+                }
+            return None
+        except Exception as e:
+            print(f"[YouTube API] Error get_broadcast_status {broadcast_id}: {e}")
+            return None
+
     def cleanup_all_upcoming(self, only_cctv_prefix=False):
         """Menghapus seluruh siaran 'upcoming' yang menumpuk di channel YouTube (Pembersih Massal)"""
         if not self.service:
@@ -521,8 +545,8 @@ class YouTubeManager:
             "snippet": {
                 "title": title,
                 "description": description,
-                # Gunakan waktu UTC +5 menit agar aman dan tidak pernah ditolak Google karena dianggap waktu lampau
-                "scheduledStartTime": (now_utc + datetime.timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                # Gunakan waktu UTC +30 detik agar aman dari drift jam dan YouTube langsung memulai auto-start
+                "scheduledStartTime": (now_utc + datetime.timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
             },
             "status": {
                 "privacyStatus": self.privacy_status,
@@ -638,7 +662,11 @@ class YouTubeManager:
         return self.service.playlistItems().insert(part="snippet", body=body).execute()
 
     def wait_for_stream_and_transition(self, broadcast_id, stream_id=None, on_live_callback=None, on_progress_callback=None, max_retries=30, delay=3):
-        """Memantau ingestion stream hingga aktif di YouTube (Hemat kuota: transisi hanya dipanggil maksimal 1x jika auto-start belum aktif)"""
+        """
+        Memantau status siaran hingga resmi LIVE di YouTube.
+        Hanya mengonfirmasi LIVE jika lifeCycleStatus benar-benar 'live' atau 'liveStarting'.
+        Tidak pernah memalsukan status LIVE atau menerima error sebagai sukses.
+        """
         if not self.service:
             self.authenticate()
 
@@ -648,101 +676,79 @@ class YouTubeManager:
         for attempt in range(max_retries):
             time.sleep(delay)
             try:
-                # 1. Cek status broadcast saat ini (hanya 1 unit kuota)
-                b_resp = self.service.liveBroadcasts().list(part="status", id=broadcast_id).execute()
-                b_items = b_resp.get("items", [])
-                if b_items:
-                    b_status = b_items[0]["status"].get("lifeCycleStatus")
-                    print(f"[YouTube API] Status Broadcast: '{b_status}' (Cek ke-{attempt+1}/{max_retries})")
-                    if b_status in ["live", "liveStarting"]:
-                        print(f"[YouTube API] Siaran {broadcast_id} RESMI LIVE ({b_status})!")
-                        if on_live_callback:
-                            try:
-                                on_live_callback()
-                            except Exception as cbe:
-                                print(f"[YouTube API Callback Error] {cbe}")
-                        return True
-                    elif b_status == "testing":
-                        if on_progress_callback:
-                            try:
-                                on_progress_callback("YouTube dalam status Testing -> Mengubah ke LIVE...")
-                            except Exception:
-                                pass
-                        if not transition_attempted:
-                            try:
-                                self.service.liveBroadcasts().transition(
-                                    broadcastStatus="live",
-                                    id=broadcast_id,
-                                    part="status"
-                                ).execute()
-                                transition_attempted = True
-                                print("[YouTube API] Transisi dari testing ke LIVE berhasil!")
-                                if on_live_callback:
-                                    try:
-                                        on_live_callback()
-                                    except Exception:
-                                        pass
-                                return True
-                            except Exception as te:
-                                print(f"[YouTube API] Menunggu transisi testing -> live: {te}")
+                # 1. Cek status broadcast saat ini di YouTube
+                b_status = None
+                try:
+                    b_resp = self.service.liveBroadcasts().list(part="id,status", id=broadcast_id).execute()
+                    b_items = b_resp.get("items", [])
+                    if b_items:
+                        b_status = b_items[0].get("status", {}).get("lifeCycleStatus")
+                        print(f"[YouTube API] Status Broadcast '{broadcast_id}': '{b_status}' (Cek ke-{attempt+1}/{max_retries})")
 
-                # 2. Cek status ingestion stream dari FFmpeg (hanya 1 unit kuota)
-                stream_active = False
-                if stream_id:
-                    s_resp = self.service.liveStreams().list(part="status", id=stream_id).execute()
-                    s_items = s_resp.get("items", [])
-                    if s_items:
-                        s_status = s_items[0]["status"].get("streamStatus")
-                        print(f"[YouTube API] Status sinyal FFmpeg di YouTube: '{s_status}'")
-                        if s_status == "active":
-                            stream_active = True
-                            if on_progress_callback:
-                                try:
-                                    on_progress_callback("Sinyal video diterima YouTube! Menghidupkan siaran...")
-                                except Exception:
-                                    pass
-                        else:
-                            if on_progress_callback:
-                                try:
-                                    on_progress_callback(f"Menunggu verifikasi sinyal oleh YouTube ({s_status})...")
-                                except Exception:
-                                    pass
-                else:
-                    stream_active = True
-
-                # 3. Transisikan broadcast ke LIVE jika sinyal stream sudah active di YouTube
-                if stream_active and not transition_attempted:
-                    # Beri jeda 1 iterasi (3 detik) agar ingest buffer YouTube siap
-                    if attempt >= 1:
-                        transition_attempted = True
-                        try:
-                            self.service.liveBroadcasts().transition(
-                                broadcastStatus="live",
-                                id=broadcast_id,
-                                part="status"
-                            ).execute()
-                            print(f"[YouTube API] Transisi manual ke LIVE berhasil dikirim!")
+                        # Konfirmasi resmi LIVE dari YouTube
+                        if b_status in ["live", "liveStarting"]:
+                            print(f"[YouTube API] Siaran {broadcast_id} RESMI LIVE ({b_status})!")
                             if on_live_callback:
                                 try:
                                     on_live_callback()
-                                except Exception:
-                                    pass
+                                except Exception as cbe:
+                                    print(f"[YouTube API Callback Error] {cbe}")
                             return True
-                        except Exception as te:
-                            err_str = str(te).lower()
-                            if "redundant" in err_str or "already" in err_str or "invalidtransition" in err_str:
-                                print(f"[YouTube API] Siaran sudah dalam status LIVE: {te}")
-                                if on_live_callback:
+
+                        if b_status in ["complete", "revoked"]:
+                            print(f"[YouTube API ERROR] Siaran {broadcast_id} berstatus '{b_status}' (siaran sudah selesai di YouTube).")
+                            return False
+                    else:
+                        print(f"[YouTube API WARNING] Broadcast ID '{broadcast_id}' tidak ditemukan di akun YouTube ini!")
+                except Exception as be:
+                    print(f"[YouTube API] Error cek broadcast {broadcast_id}: {be}")
+
+                # 2. Cek status sinyal video FFmpeg di YouTube (streamStatus)
+                stream_active = False
+                if stream_id:
+                    try:
+                        s_resp = self.service.liveStreams().list(part="status", id=stream_id).execute()
+                        s_items = s_resp.get("items", [])
+                        if s_items:
+                            s_status = s_items[0].get("status", {}).get("streamStatus")
+                            print(f"[YouTube API] Status sinyal FFmpeg di YouTube: '{s_status}'")
+                            if s_status == "active":
+                                stream_active = True
+                                if on_progress_callback:
                                     try:
-                                        on_live_callback()
+                                        on_progress_callback("Sinyal video diterima YouTube! Menunggu YouTube memulai siaran otomatis...")
                                     except Exception:
                                         pass
-                                return True
                             else:
-                                print(f"[YouTube API] Percobaan transisi ke live: {te}")
-            except Exception as e:
-                print(f"[YouTube API] Menunggu stream active: {e}")
+                                if on_progress_callback:
+                                    try:
+                                        on_progress_callback(f"Menunggu verifikasi sinyal oleh YouTube ({s_status})...")
+                                    except Exception:
+                                        pass
+                    except Exception as se:
+                        print(f"[YouTube API] Info cek stream {stream_id}: {se}")
+                else:
+                    stream_active = True
 
+                # 3. Fallback Transisi Manual:
+                # Karena enableAutoStart: True, YouTube normalnya otomatis memulai siaran dalam 10-15 detik.
+                # Hanya jika stream_active sudah lama (attempt >= 6 / 18 detik) dan belum beralih ke live:
+                if stream_active and attempt >= 6 and not transition_attempted and b_status in ["ready", "testing"]:
+                    transition_attempted = True
+                    try:
+                        self.service.liveBroadcasts().transition(
+                            broadcastStatus="live",
+                            id=broadcast_id,
+                            part="status"
+                        ).execute()
+                        print(f"[YouTube API] Transisi manual ke LIVE berhasil dikirim.")
+                    except Exception as te:
+                        print(f"[YouTube API Transition Notice]: {te}")
+
+            except Exception as e:
+                print(f"[YouTube API Polling Error] {e}")
+
+        print(f"[YouTube API] Batas waktu pemantauan siaran {broadcast_id} tercapai.")
         return False
 
     def transition_to_live(self, broadcast_id):

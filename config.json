@@ -1,7 +1,7 @@
 {
     "app_name": "PosRonda",
     "app_tagline": "Autonomous CCTV Multi-Camera Hub & YouTube Streaming Engine",
-    "version": "4.4.8",
+    "version": "4.4.9",
     "language": "id",
     "default_camera_credentials": {
         "username": "admin",
@@ -40,8 +40,8 @@
         "stream_key": "",
         "max_duration_hours": 11,
         "rollover_lead_minutes": 5,
-        "encoder": "h264_qsv",
-        "x264_preset": "veryfast",
+        "encoder": "libx264",
+        "x264_preset": "ultrafast",
         "fps": 25,
         "bitrate_kbps": 1200,
         "grid_resolution": "1280x720",

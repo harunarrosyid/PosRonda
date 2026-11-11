@@ -544,12 +544,15 @@ class FFmpegStreamPusher:
         max_rate = f"{numeric_br + 300}k"
         buf_size = f"{(numeric_br + 300) * 2}k"
 
-        attempts = [
-            ("h264_qsv", "veryfast"),
-            ("libx264", "ultrafast")
-        ]
-        if self.encoder and self.encoder not in ["h264_qsv", "libx264"]:
-            attempts.insert(0, (self.encoder, self.preset))
+        attempts = []
+        if self.encoder == "libx264":
+            attempts = [("libx264", self.preset or "ultrafast"), ("h264_qsv", "veryfast")]
+        elif self.encoder == "h264_qsv":
+            attempts = [("h264_qsv", self.preset or "veryfast"), ("libx264", "ultrafast")]
+        elif self.encoder:
+            attempts = [(self.encoder, self.preset), ("libx264", "ultrafast")]
+        else:
+            attempts = [("libx264", "ultrafast"), ("h264_qsv", "veryfast")]
 
         self.running = False
         for enc, pre in attempts:

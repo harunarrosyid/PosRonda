@@ -54,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.8"
+    __version__ = "4.4.9"
 
 class CCTVApp:
     def __init__(self, root):
@@ -648,9 +648,16 @@ class CCTVApp:
 
                         self.update_status("Menghubungkan ke YouTube Live API...", is_live=False)
 
-                        # 1. Coba pulihkan state siaran sebelumnya jika baru saja me-restart (State Resume)
+                        # 1. Coba pulihkan state siaran sebelumnya HANYA jika siaran masih aktif di YouTube
                         saved_state = self._load_stream_state()
                         broadcast_info = None
+
+                        # Jika pengguna sengaja memulai sesi baru secara manual, jangan gunakan state lama
+                        if getattr(self, "manual_start_fresh", False):
+                            force_fresh = True
+                            self.manual_start_fresh = False
+                            self._clear_stream_state()
+                            saved_state = None
 
                         if saved_state and not force_fresh:
                             saved_start = saved_state.get("stream_start_time", 0)
@@ -660,10 +667,28 @@ class CCTVApp:
                             elapsed_prev = time.time() - saved_start
 
                             if 0 < elapsed_prev < max_sec:
-                                broadcast_info = saved_state
-                                self.stream_start_time = saved_start
-                                resumed_existing = True
-                                print(f"[YouTube API] State Resume: Melanjutkan siaran aktif '{broadcast_info.get('title')}' (Sudah berjalan {elapsed_prev/60:.1f} menit)")
+                                saved_b_id = saved_state.get("broadcast_id")
+                                is_valid = False
+                                try:
+                                    if self.youtube_mgr and saved_b_id:
+                                        b_stat = self.youtube_mgr.get_broadcast_status(saved_b_id)
+                                        # Siaran lama HANYA boleh di-resume jika statusnya masih hidup di YouTube
+                                        if b_stat and b_stat.get("lifeCycleStatus") in ["live", "liveStarting", "testing", "ready"]:
+                                            is_valid = True
+                                        else:
+                                            print(f"[YouTube API] Siaran lama '{saved_b_id}' sudah tidak aktif ({b_stat.get('lifeCycleStatus') if b_stat else 'tidak ada'}). State lama dibuang.")
+                                except Exception as ve:
+                                    print(f"[YouTube API] Info verifikasi siaran lama: {ve}")
+
+                                if is_valid:
+                                    broadcast_info = saved_state
+                                    self.stream_start_time = saved_start
+                                    resumed_existing = True
+                                    print(f"[YouTube API] State Resume: Melanjutkan siaran aktif '{broadcast_info.get('title')}' (Sudah berjalan {elapsed_prev/60:.1f} menit)")
+                                else:
+                                    self._clear_stream_state()
+                            else:
+                                self._clear_stream_state()
 
                         # 2. Jika tidak ada state resume, cari siaran upcoming yang sudah siap (Hemat kuota)
                         if not broadcast_info and not force_fresh:
@@ -965,6 +990,7 @@ class CCTVApp:
             threading.Thread(target=do_end, daemon=True).start()
             self.current_broadcast = None
 
+        self._clear_stream_state()
         self.stream_trigger.set()
         self.update_status(f"{mode_label} telah diakhiri. Monitoring kamera lokal aktif.", is_live=False)
 
@@ -987,6 +1013,7 @@ class CCTVApp:
                     self.open_settings(initial_tab=1)
                 return
 
+        self.manual_start_fresh = True
         self.streaming_enabled = True
         self.is_paused = False
         self.restart_requested = False
