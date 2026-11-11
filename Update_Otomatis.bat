@@ -4,7 +4,7 @@ title Update Otomatis PosRonda Hub
 color 0B
 
 echo ========================================================
-echo        UPDATE OTOMATIS POSRONDA HUB v4.4.6
+echo        UPDATE OTOMATIS POSRONDA HUB v4.4.7
 echo ========================================================
 echo.
 

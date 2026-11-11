@@ -52,10 +52,16 @@ class YouTubeManager:
         self.single_stream_mode = self.cfg.get("single_stream_mode", True)
         self.service = None
 
-    def authenticate(self):
+    def authenticate(self, force_reauth=False):
         """Autentikasi OAuth 2.0 (hanya perlu login browser sekali, token disimpan di token.json)"""
         creds = None
-        if os.path.exists(self.token_file):
+        if force_reauth and os.path.exists(self.token_file):
+            try:
+                os.remove(self.token_file)
+            except Exception as e:
+                print(f"[OAuth] Info hapus token lama: {e}")
+
+        if not force_reauth and os.path.exists(self.token_file):
             try:
                 creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
             except Exception as e:
@@ -77,7 +83,7 @@ class YouTubeManager:
                     )
                 flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, SCOPES)
                 try:
-                    creds = flow.run_local_server(port=0, prompt="consent select_account", access_type="offline")
+                    creds = flow.run_local_server(port=0, prompt="select_account consent", access_type="offline")
                 except TypeError:
                     creds = flow.run_local_server(port=0)
 
@@ -86,6 +92,61 @@ class YouTubeManager:
 
         self.service = build("youtube", "v3", credentials=creds)
         return True
+
+    def get_connected_channel_info(self):
+        """
+        Mengambil informasi detail channel yang saat ini terhubung:
+        (nama channel, channel ID, status live streaming, stream key).
+        Mengembalikan dict atau None jika gagal.
+        """
+        if not self.service:
+            self.authenticate()
+
+        ch_resp = self.service.channels().list(part="snippet,status", mine=True).execute()
+        items = ch_resp.get("items", [])
+        if not items:
+            return None
+
+        ch = items[0]
+        channel_name = ch["snippet"]["title"]
+        channel_id = ch["id"]
+
+        live_enabled = False
+        live_msg = "Memeriksa izin live streaming..."
+        stream_key = None
+        try:
+            s_resp = self.service.liveStreams().list(part="cdn,snippet", mine=True, maxResults=1).execute()
+            live_enabled = True
+            live_msg = "Live Streaming Aktif & Siap Digunakan"
+            s_items = s_resp.get("items", [])
+            if s_items:
+                stream_key = s_items[0]["cdn"]["ingestionInfo"]["streamName"]
+        except Exception as se:
+            err_str = str(se).lower()
+            if "livestreamingnotenabled" in err_str or "403" in err_str:
+                live_enabled = False
+                live_msg = "Live Streaming BELUM AKTIF pada channel ini (Error 403). Ganti ke Channel CCTV Anda atau aktifkan di YouTube Studio."
+            else:
+                live_enabled = True
+                live_msg = "Live Streaming Siap"
+
+        return {
+            "channel_title": channel_name,
+            "channel_id": channel_id,
+            "live_enabled": live_enabled,
+            "live_msg": live_msg,
+            "stream_key": stream_key
+        }
+
+    def switch_account(self):
+        """Mereset token OAuth dan memaksa pemilihan channel / Brand Account ulang di browser."""
+        if os.path.exists(self.token_file):
+            try:
+                os.remove(self.token_file)
+            except Exception as e:
+                print(f"[OAuth] Gagal menghapus token lama: {e}")
+        self.service = None
+        return self.authenticate(force_reauth=True)
 
     def test_connection(self, playlist_id=None):
         """Memeriksa apakah token/kredensial valid, mengambil nama channel & status playlist."""
@@ -101,26 +162,13 @@ class YouTubeManager:
         channel_name = items[0]["snippet"]["title"]
         msg = f"[OK] Berhasil terhubung ke Channel: '{channel_name}'"
 
-        # 2. Cek Playlist jika diisi
-        target_pl = playlist_id or self.playlist_id
-        if target_pl:
-            try:
-                pl_resp = self.service.playlists().list(part="snippet", id=target_pl).execute()
-                pl_items = pl_resp.get("items", [])
-                if pl_items:
-                    pl_title = pl_items[0]["snippet"]["title"]
-                    msg += f"\n[OK] Playlist Valid: '{pl_title}' (ID: {target_pl})"
-                else:
-                    msg += f"\n[PERINGATAN] Playlist ID '{target_pl}' tidak ditemukan atau bersifat private."
-            except Exception as e:
-                msg += f"\n[PERINGATAN] Gagal memverifikasi Playlist: {e}"
-        else:
-            msg += "\n[INFO] Playlist ID kosong (Video tidak akan otomatis dimasukkan ke playlist)."
-
-        # 3. Coba deteksi stream key yang sudah ada di channel ini & cek izin live streaming
+        # 2. Cek izin live streaming channel ini
         stream_key = None
+        live_ok = False
         try:
             s_resp = self.service.liveStreams().list(part="cdn,snippet", mine=True, maxResults=5).execute()
+            live_ok = True
+            msg += "\n[OK] Izin Live Streaming: AKTIF & SIAP DIGUNAKAN"
             s_items = s_resp.get("items", [])
             if s_items:
                 stream_key = s_items[0]["cdn"]["ingestionInfo"]["streamName"]
@@ -129,8 +177,36 @@ class YouTubeManager:
             else:
                 msg += "\n[INFO] Belum ada stream key aktif di YouTube Studio."
         except Exception as se:
-            err_str = str(se)
-            msg += "\n[INFO] Salin dan masukkan Stream Key Anda langsung dari YouTube Studio di menu Pengaturan."
+            err_str = str(se).lower()
+            if "livestreamingnotenabled" in err_str or "403" in err_str:
+                live_ok = False
+                msg += (
+                    f"\n[PERINGATAN KRUSIAL] Channel '{channel_name}' BELUM DIIZINKAN Live Streaming (Error 403).\n"
+                    "Google saat ini menghubungkan ke channel/profil yang belum memiliki izin siaran.\n"
+                    "Silakan klik tombol 'Ganti Channel / Akun YouTube' di menu Pengaturan, lalu pastikan Anda mengklik "
+                    "nama Channel CCTV / Brand Account Anda di halaman browser Google!"
+                )
+            else:
+                msg += f"\n[INFO] Status stream key: {se}"
+
+        # 3. Cek Playlist jika diisi
+        target_pl = (playlist_id or self.playlist_id or "").strip()
+        if target_pl:
+            try:
+                pl_resp = self.service.playlists().list(part="snippet", id=target_pl).execute()
+                pl_items = pl_resp.get("items", [])
+                if pl_items:
+                    pl_title = pl_items[0]["snippet"]["title"]
+                    msg += f"\n[OK] Playlist Valid: '{pl_title}' (ID: {target_pl})"
+                else:
+                    msg += (
+                        f"\n[PERINGATAN] Playlist ID '{target_pl}' TIDAK DITEMUKAN di Channel '{channel_name}'.\n"
+                        "Playlist ini kemungkinan berada di Channel lain. Klik 'Muat' pada 'Pilih Playlist' untuk memilih playlist milik channel ini."
+                    )
+            except Exception as e:
+                msg += f"\n[PERINGATAN] Gagal memverifikasi Playlist: {e}"
+        else:
+            msg += "\n[INFO] Playlist ID kosong (Video tidak akan otomatis dimasukkan ke playlist)."
 
         return True, msg, stream_key
 

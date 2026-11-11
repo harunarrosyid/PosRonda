@@ -1,5 +1,5 @@
 """
-PosRonda Hub v4.4.6 - Main Launcher
+PosRonda Hub v4.4.7 - Main Launcher
 Autonomous CCTV Multi-Camera Hub & Streaming Engine
 Kompatibel penuh dengan pemanggilan 'python main.py' maupun 'python run.py'.
 """

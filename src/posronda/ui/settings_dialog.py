@@ -119,6 +119,7 @@ class SettingsDialog(tk.Toplevel):
         self.bind("<Control-S>", lambda e: self.save_all())
 
         self.create_widgets()
+        self.after(200, self._auto_check_connected_channel)
 
     def create_widgets(self):
         # 1. Top Header Bar
@@ -909,6 +910,35 @@ class SettingsDialog(tk.Toplevel):
         )
         chk_api.pack(anchor="w", pady=(0, 4))
 
+        # Card Status Channel Terhubung & Tombol Ganti Akun / Channel
+        f_ch_card = tk.Frame(f_api_box, bg="#1e293b", padx=8, pady=6, highlightthickness=1, highlightbackground="#334155")
+        f_ch_card.pack(fill="x", pady=(4, 6))
+
+        f_ch_row1 = tk.Frame(f_ch_card, bg="#1e293b")
+        f_ch_row1.pack(fill="x")
+
+        tk.Label(f_ch_row1, text="Channel Terhubung:", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 8)).pack(side="left")
+        self.lbl_connected_channel = tk.Label(f_ch_row1, text="Memeriksa...", bg="#1e293b", fg="#38bdf8", font=("Segoe UI", 8, "bold"))
+        self.lbl_connected_channel.pack(side="left", padx=(4, 8))
+
+        btn_switch_ch = tk.Button(
+            f_ch_row1,
+            text="Ganti Channel / Akun YouTube",
+            bg="#4338ca", fg="#ffffff",
+            activebackground="#4f46e5", activeforeground="#ffffff",
+            relief="flat", font=("Segoe UI", 7, "bold"),
+            padx=8, pady=2, cursor="hand2",
+            command=self.switch_youtube_channel
+        )
+        btn_switch_ch.pack(side="right")
+
+        f_ch_row2 = tk.Frame(f_ch_card, bg="#1e293b")
+        f_ch_row2.pack(fill="x", pady=(3, 0))
+
+        tk.Label(f_ch_row2, text="Status Izin Live:", bg="#1e293b", fg="#94a3b8", font=("Segoe UI", 8)).pack(side="left")
+        self.lbl_live_status = tk.Label(f_ch_row2, text="Klik 'Tes YouTube API' untuk memeriksa izin", bg="#1e293b", fg="#cbd5e1", font=("Segoe UI", 8))
+        self.lbl_live_status.pack(side="left", padx=4)
+
         f_sec = tk.Frame(f_api_box, bg="#0f172a")
         f_sec.pack(fill="x", pady=2)
         tk.Label(f_sec, text="Client Secret JSON:", bg="#0f172a", fg="#cbd5e1", font=("Segoe UI", 8), width=18, anchor="w").pack(side="left")
@@ -1129,6 +1159,129 @@ class SettingsDialog(tk.Toplevel):
         else:
             messagebox.showerror("Error", "Modul CreatePlaylistDialog tidak tersedia.", parent=self)
 
+    def _auto_check_connected_channel(self):
+        """Mengecek channel YouTube yang saat ini terhubung di latar belakang saat dialog dibuka"""
+        if not hasattr(self, 'lbl_connected_channel'):
+            return
+        secret_file = self.ent_secret.get().strip() if hasattr(self, 'ent_secret') else ""
+        if not secret_file or not os.path.exists(secret_file):
+            self.lbl_connected_channel.config(text="Belum disetel", fg="#94a3b8")
+            self.lbl_live_status.config(text="Pilih client_secrets.json terlebih dahulu", fg="#94a3b8")
+            return
+
+        def _do_check():
+            try:
+                try:
+                    from posronda.network.youtube_manager import YouTubeManager
+                except ImportError:
+                    from youtube_manager import YouTubeManager
+
+                temp_cfg = dict(self.cfg)
+                temp_cfg.setdefault("youtube_api", {})["client_secrets_file"] = secret_file
+                yt = YouTubeManager(temp_cfg)
+                if not os.path.exists(yt.token_file):
+                    self.after(0, lambda: self.lbl_connected_channel.config(text="Belum Login (Klik 'Ganti')", fg="#f59e0b"))
+                    self.after(0, lambda: self.lbl_live_status.config(text="Belum ada token. Klik 'Ganti Channel' untuk login", fg="#94a3b8"))
+                    return
+
+                ch_info = yt.get_connected_channel_info()
+                if ch_info:
+                    def _apply():
+                        self.lbl_connected_channel.config(text=ch_info["channel_title"], fg="#38bdf8")
+                        if ch_info.get("live_enabled", False):
+                            self.lbl_live_status.config(text=f"[DIIZINKAN] {ch_info['live_msg']}", fg="#34d399")
+                        else:
+                            self.lbl_live_status.config(text=f"[PERINGATAN] {ch_info['live_msg']}", fg="#f87171")
+                    self.after(0, _apply)
+            except Exception as e:
+                self.after(0, lambda: self.lbl_connected_channel.config(text="Token kadaluarsa / belum login", fg="#94a3b8"))
+                self.after(0, lambda: self.lbl_live_status.config(text="Klik 'Ganti Channel' untuk login ulang", fg="#94a3b8"))
+
+        threading.Thread(target=_do_check, daemon=True).start()
+
+    def switch_youtube_channel(self):
+        """Memandu pengguna mengganti akun atau channel Brand Account di Google OAuth"""
+        secret_file = self.ent_secret.get().strip()
+        if not secret_file or not os.path.exists(secret_file):
+            messagebox.showerror(
+                "Client Secret Tidak Ditemukan",
+                f"File '{secret_file}' tidak ditemukan!\nPilih file client_secrets.json terlebih dahulu.",
+                parent=self
+            )
+            return
+
+        confirm = messagebox.askyesno(
+            "Ganti Channel YouTube",
+            "Aplikasi akan membuka browser Google untuk memilih akun / Channel Brand YouTube.\n\n"
+            "PETUNJUK PENTING DI BROWSER GOOGLE:\n"
+            "1. Masuk ke Akun Google Anda.\n"
+            "2. Pada halaman 'Pilih akun atau akun merek', PASTIKAN KLIK NAMA CHANNEL CCTV ANDA (bukan profil email pribadi)!\n"
+            "3. Berikan izin akses YouTube.\n\n"
+            "Lanjutkan ke browser?",
+            parent=self
+        )
+        if not confirm:
+            return
+
+        self.lbl_connected_channel.config(text="Menunggu otentikasi di browser...", fg="#f59e0b")
+        self.lbl_live_status.config(text="Silakan pilih Channel CCTV Anda di browser Google", fg="#cbd5e1")
+
+        def run_switch():
+            try:
+                try:
+                    from posronda.network.youtube_manager import YouTubeManager
+                except ImportError:
+                    from youtube_manager import YouTubeManager
+
+                temp_cfg = dict(self.cfg)
+                temp_cfg.setdefault("youtube_api", {})["client_secrets_file"] = secret_file
+                yt = YouTubeManager(temp_cfg)
+                yt.switch_account()
+
+                ch_info = yt.get_connected_channel_info()
+                if ch_info:
+                    def _update():
+                        ch_name = ch_info.get("channel_title", "Channel Tidak Dikenal")
+                        live_ok = ch_info.get("live_enabled", False)
+                        live_msg = ch_info.get("live_msg", "")
+                        stream_key = ch_info.get("stream_key")
+
+                        self.lbl_connected_channel.config(text=ch_name, fg="#38bdf8")
+                        if live_ok:
+                            self.lbl_live_status.config(text=f"[DIIZINKAN] {live_msg}", fg="#34d399")
+                        else:
+                            self.lbl_live_status.config(text=f"[PERINGATAN] {live_msg}", fg="#f87171")
+
+                        if stream_key:
+                            self.ent_stream_key.delete(0, tk.END)
+                            self.ent_stream_key.insert(0, stream_key)
+
+                        messagebox.showinfo(
+                            "Channel YouTube Berhasil Dihubungkan",
+                            f"Channel YouTube berhasil diganti!\n\n"
+                            f"Channel Terhubung: {ch_name}\n"
+                            f"Status Live: {'DIIZINKAN' if live_ok else 'BELUM AKTIF'}\n\n"
+                            f"Daftar playlist untuk channel '{ch_name}' akan otomatis dimuat.",
+                            parent=self
+                        )
+                        # Otomatis muat daftar playlist milik channel baru
+                        self.fetch_channel_playlists(silent=True)
+
+                    self.after(0, _update)
+            except Exception as e:
+                import traceback
+                err_text = traceback.format_exc()
+                self.after(0, lambda: show_error_dialog(
+                    self,
+                    "Gagal Mengganti Channel",
+                    f"Terjadi kesalahan saat otentikasi Google:\n{e}",
+                    error_details=err_text,
+                    action_url="https://studio.youtube.com",
+                    action_url_label="Buka YouTube Studio"
+                ))
+
+        threading.Thread(target=run_switch, daemon=True).start()
+
     def test_youtube_api(self):
         secret_file = self.ent_secret.get().strip()
         playlist_id = self.ent_playlist.get().strip()
@@ -1165,6 +1318,19 @@ class SettingsDialog(tk.Toplevel):
                         if detected_key and not self.ent_stream_key.get().strip():
                             self.ent_stream_key.delete(0, tk.END)
                             self.ent_stream_key.insert(0, detected_key)
+
+                        # Update card status channel
+                        try:
+                            ch_info = yt.get_connected_channel_info()
+                            if ch_info:
+                                self.lbl_connected_channel.config(text=ch_info["channel_title"], fg="#38bdf8")
+                                if ch_info.get("live_enabled", False):
+                                    self.lbl_live_status.config(text=f"[DIIZINKAN] {ch_info['live_msg']}", fg="#34d399")
+                                else:
+                                    self.lbl_live_status.config(text=f"[PERINGATAN] {ch_info['live_msg']}", fg="#f87171")
+                        except Exception:
+                            pass
+
                         messagebox.showinfo("Koneksi YouTube API Sukses", message, parent=self)
                         # Otomatis muat daftar playlist setelah API sukses terhubung
                         self.fetch_channel_playlists(silent=True)

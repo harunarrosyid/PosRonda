@@ -54,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.6"
+    __version__ = "4.4.7"
 
 class CCTVApp:
     def __init__(self, root):
@@ -777,8 +777,13 @@ class CCTVApp:
                 else:
                     if self.streaming_enabled:
                         if api_error:
-                            self.lbl_status_icon.config(text="API ERROR", bg="#450a0a", fg="#ef4444")
-                            self.lbl_status_text.config(text=f"Gagal buat siaran: {api_error}. Periksa kredensial YouTube API atau Stream Key.")
+                            err_l = api_error.lower()
+                            if "livestreamingnotenabled" in err_l or "not enabled for live streaming" in err_l:
+                                self.lbl_status_icon.config(text="CHANNEL SALAH (403)", bg="#450a0a", fg="#ef4444")
+                                self.lbl_status_text.config(text="Channel saat ini belum diizinkan live streaming. Buka [F2] lalu klik 'Ganti Channel' untuk memilih Channel CCTV Anda.")
+                            else:
+                                self.lbl_status_icon.config(text="API ERROR", bg="#450a0a", fg="#ef4444")
+                                self.lbl_status_text.config(text=f"Gagal buat siaran: {api_error}. Buka [F2] untuk memeriksa Channel atau Stream Key.")
                         else:
                             self.lbl_status_icon.config(text="STREAM KEY KOSONG", bg="#450a0a", fg="#ef4444")
                             self.lbl_status_text.config(text="Stream Key belum diatur. Tekan [F2] untuk mengisi Stream Key.")
