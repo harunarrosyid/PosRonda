@@ -302,13 +302,26 @@ class YouTubeManager:
             # Filter yang awalan judulnya cocok dengan CCTV Hub kita
             matched = [i for i in items if self.title_prefix.lower() in i["snippet"].get("title", "").lower()]
             if not matched:
-                matched = items
+                return None
 
             # Urutkan dari yang terbaru
             matched.sort(
                 key=lambda x: x.get("snippet", {}).get("scheduledStartTime") or x.get("snippet", {}).get("publishedAt", ""),
                 reverse=True
             )
+
+            # Periksa usia siaran terbaru: jika dibuat lebih dari 6 jam lalu, anggap basi
+            latest = matched[0]
+            pub_time_str = latest.get("snippet", {}).get("publishedAt")
+            if pub_time_str:
+                try:
+                    pub_dt = datetime.datetime.fromisoformat(pub_time_str.replace("Z", "+00:00"))
+                    now_utc = datetime.datetime.now(datetime.timezone.utc)
+                    if (now_utc - pub_dt).total_seconds() > (6 * 3600):
+                        print("[YouTube API] Siaran upcoming yang ditemukan sudah basi (> 6 jam). Melewati...")
+                        return None
+                except Exception:
+                    pass
 
             # Cari siaran yang memiliki stream key valid
             valid_item = None
@@ -533,21 +546,35 @@ class YouTubeManager:
         broadcast_id = broadcast_resp["id"]
 
         # 2. Dapatkan atau Buat Live Stream Ingestion (Stream Key)
-        # Optimasi: Gunakan kembali stream ingestion yang sudah ada (hemat 50 unit kuota API!)
+        # Optimasi: Prioritaskan stream key yang terkonfigurasi atau gunakan kembali yang ada (hemat kuota)
         stream_id = None
         stream_name = None
         ingestion_address = None
 
+        configured_key = (self.cfg.get("stream_key") or self.cfg.get("streaming", {}).get("stream_key") or "").strip()
         try:
-            s_list = self.service.liveStreams().list(part="id,cdn", mine=True, maxResults=5).execute()
-            for s_item in s_list.get("items", []):
-                ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
-                if ing_info.get("streamName") and ing_info.get("ingestionAddress"):
-                    stream_id = s_item["id"]
-                    stream_name = ing_info["streamName"]
-                    ingestion_address = ing_info["ingestionAddress"]
-                    print(f"[YouTube API] Menggunakan Stream Ingestion yang sudah ada: {stream_id}")
-                    break
+            s_list = self.service.liveStreams().list(part="id,cdn", mine=True, maxResults=10).execute()
+            items = s_list.get("items", [])
+            # Jika user punya stream_key tertentu di config, prioritaskan yang cocok
+            if configured_key:
+                for s_item in items:
+                    ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
+                    if ing_info.get("streamName") == configured_key:
+                        stream_id = s_item["id"]
+                        stream_name = ing_info["streamName"]
+                        ingestion_address = ing_info.get("ingestionAddress", "rtmp://a.rtmp.youtube.com/live2")
+                        print(f"[YouTube API] Menggunakan Stream Ingestion sesuai konfigurasi: {stream_id}")
+                        break
+            # Jika belum ditemukan, gunakan ingestion yang ada
+            if not stream_id:
+                for s_item in items:
+                    ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
+                    if ing_info.get("streamName") and ing_info.get("ingestionAddress"):
+                        stream_id = s_item["id"]
+                        stream_name = ing_info["streamName"]
+                        ingestion_address = ing_info["ingestionAddress"]
+                        print(f"[YouTube API] Menggunakan Stream Ingestion yang sudah ada: {stream_id}")
+                        break
         except Exception as le:
             print(f"[YouTube API] Info cek stream existing: {le}")
 
@@ -683,33 +710,36 @@ class YouTubeManager:
                 else:
                     stream_active = True
 
-                # 3. Karena enableAutoStart: True, YouTube otomatis LIVE saat data video masuk.
-                # Hanya jika stream_active sudah lama (attempt >= 8) dan belum live, lakukan transisi manual SEKALI SAJA!
-                if stream_active and attempt >= 8 and not transition_attempted:
-                    transition_attempted = True
-                    try:
-                        self.service.liveBroadcasts().transition(
-                            broadcastStatus="live",
-                            id=broadcast_id,
-                            part="status"
-                        ).execute()
-                        print(f"[YouTube API] Transisi manual ke LIVE berhasil dikirim!")
-                        if on_live_callback:
-                            try:
-                                on_live_callback()
-                            except Exception:
-                                pass
-                        return True
-                    except Exception as te:
-                        err_str = str(te).lower()
-                        if "redundant" in err_str or "already" in err_str or "invalidtransition" in err_str:
-                            print("[YouTube API] Siaran sudah dalam status LIVE!")
+                # 3. Transisikan broadcast ke LIVE jika sinyal stream sudah active di YouTube
+                if stream_active and not transition_attempted:
+                    # Beri jeda 1 iterasi (3 detik) agar ingest buffer YouTube siap
+                    if attempt >= 1:
+                        transition_attempted = True
+                        try:
+                            self.service.liveBroadcasts().transition(
+                                broadcastStatus="live",
+                                id=broadcast_id,
+                                part="status"
+                            ).execute()
+                            print(f"[YouTube API] Transisi manual ke LIVE berhasil dikirim!")
                             if on_live_callback:
                                 try:
                                     on_live_callback()
                                 except Exception:
                                     pass
                             return True
+                        except Exception as te:
+                            err_str = str(te).lower()
+                            if "redundant" in err_str or "already" in err_str or "invalidtransition" in err_str:
+                                print(f"[YouTube API] Siaran sudah dalam status LIVE: {te}")
+                                if on_live_callback:
+                                    try:
+                                        on_live_callback()
+                                    except Exception:
+                                        pass
+                                return True
+                            else:
+                                print(f"[YouTube API] Percobaan transisi ke live: {te}")
             except Exception as e:
                 print(f"[YouTube API] Menunggu stream active: {e}")
 

@@ -54,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.7"
+    __version__ = "4.4.8"
 
 class CCTVApp:
     def __init__(self, root):
@@ -676,6 +676,10 @@ class CCTVApp:
 
                         # 3. Jika belum ada, buat siaran baru via API (membersihkan sisa upcoming lama)
                         if not broadcast_info:
+                            try:
+                                self.youtube_mgr.cleanup_all_upcoming(only_cctv_prefix=True)
+                            except Exception as ce:
+                                print(f"[YouTube API] Info pembersihan upcoming lama: {ce}")
                             broadcast_info = self.youtube_mgr.create_broadcast_and_stream(force_new=force_fresh)
                             self.stream_start_time = time.time()
 
@@ -849,6 +853,7 @@ class CCTVApp:
 
                         if self.pusher.start():
                             consecutive_stream_drops = 0
+                            self.pusher_start_time = time.time()
                             self.update_status("Koneksi berhasil dipulihkan! Melanjutkan streaming...", is_live=True)
                             continue
                     else:
@@ -1184,18 +1189,21 @@ class CCTVApp:
                     self.lbl_status_text.config(text=f"FFmpeg tertutup (Kode: {exit_code})! Periksa ffmpeg_log.txt.")
                 else:
                     # Auto-promote ke LIVE jika FFmpeg sudah aktif mengalir stabil > 3 detik
+                    # PENTING: Untuk YouTube API, status LIVE HANYA diset saat YouTube API mengonfirmasi (on_live callback)
+                    # Jangan pernah auto-promote lokal untuk YouTube API agar status PosRonda sinkron 100% dengan YouTube Studio!
                     if not self.is_streaming and self.pusher_start_time > 0 and (time.time() - self.pusher_start_time) >= 3.0:
-                        self.is_streaming = True
-                        start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
-                        if stream_mode == "local_recording":
-                            rec_dir = self.cfg.get("streaming", {}).get("local_record", {}).get("output_dir", "recordings")
-                            self.lbl_status_text.config(text=f"PEREKAMAN AKTIF: Menyimpan video lokal ke {rec_dir}/ (Mulai {start_clock} WIB)")
-                        elif stream_mode == "private_rtmp":
-                            target_url = self.cfg.get("streaming", {}).get("custom_rtmp_url", "Private Server")
-                            self.lbl_status_text.config(text=f"PRIVATE LIVE: Mengalir ke {target_url} (Mulai {start_clock} WIB)")
-                        else:
-                            title = self.current_broadcast.get('title', 'PosRonda Live') if self.current_broadcast else "Streaming PosRonda"
-                            self.lbl_status_text.config(text=f"RESMI LIVE: {title} (Tayang sejak {start_clock} WIB)")
+                        is_yt_api = (stream_mode == "youtube" and self.cfg.get("youtube_api", {}).get("enabled", False))
+                        if not is_yt_api:
+                            self.is_streaming = True
+                            start_clock = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
+                            if stream_mode == "local_recording":
+                                rec_dir = self.cfg.get("streaming", {}).get("local_record", {}).get("output_dir", "recordings")
+                                self.lbl_status_text.config(text=f"PEREKAMAN AKTIF: Menyimpan video lokal ke {rec_dir}/ (Mulai {start_clock} WIB)")
+                            elif stream_mode == "private_rtmp":
+                                target_url = self.cfg.get("streaming", {}).get("custom_rtmp_url", "Private Server")
+                                self.lbl_status_text.config(text=f"PRIVATE LIVE: Mengalir ke {target_url} (Mulai {start_clock} WIB)")
+                            else:
+                                self.lbl_status_text.config(text=f"RESMI LIVE: RTMP Streaming Aktif (Tayang sejak {start_clock} WIB)")
 
                     if self.is_streaming:
                         elapsed_sec = int(time.time() - (self.stream_start_time or time.time()))

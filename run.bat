@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title PosRonda Hub v4.4.7 - Autonomous CCTV Engine
+title PosRonda Hub v4.4.8 - Autonomous CCTV Engine
 color 0B
 
 set "PYTHON_EXE="
@@ -29,7 +29,7 @@ for /f "tokens=*" %%i in ('where python 2^>nul') do (
 :run_app
 if "%PYTHON_EXE%"=="" set "PYTHON_EXE=python"
 
-echo Menjalankan PosRonda Hub v4.4.7...
+echo Menjalankan PosRonda Hub v4.4.8...
 "%PYTHON_EXE%" run.py
 if errorlevel 1 (
     color 0C

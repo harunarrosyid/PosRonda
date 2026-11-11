@@ -488,7 +488,6 @@ class FFmpegStreamPusher:
                 "-g", str(self.fps * 2),
                 "-c:a", "aac",
                 "-b:a", "64k",
-                "-rw_timeout", "10000000",
                 "-f", "flv",
                 "-flvflags", "no_duration_filesize",
                 target
@@ -597,7 +596,16 @@ class FFmpegStreamPusher:
 
                     return True
                 else:
-                    print(f"[FFmpeg WARNING] Encoder {enc} berhenti (Exit Code: {poll}). Mencoba opsi cadangan...")
+                    err_msg = ""
+                    try:
+                        if os.path.exists(log_file_path):
+                            with open(log_file_path, "r", encoding="utf-8", errors="ignore") as lf:
+                                err_lines = lf.readlines()
+                                if err_lines:
+                                    err_msg = "".join(err_lines[-10:]).strip()
+                    except Exception:
+                        pass
+                    print(f"[FFmpeg WARNING] Encoder {enc} berhenti (Exit Code: {poll}). Detail:\n{err_msg}\nMencoba opsi cadangan...")
                     self.running = False
                     if self.feed_thread and self.feed_thread.is_alive():
                         self.feed_thread.join(timeout=0.5)
