@@ -623,11 +623,44 @@ class YouTubeManager:
             ingestion_address = stream_resp["cdn"]["ingestionInfo"]["ingestionAddress"]
 
         # 3. Ikat (Bind) Broadcast ke Stream
-        self.service.liveBroadcasts().bind(
-            id=broadcast_id,
-            streamId=stream_id,
-            part="id,contentDetails"
-        ).execute()
+        try:
+            self.service.liveBroadcasts().bind(
+                id=broadcast_id,
+                streamId=stream_id,
+                part="id,contentDetails"
+            ).execute()
+            print(f"[YouTube API] Berhasil mengikat broadcast {broadcast_id} ke stream {stream_id}")
+        except Exception as be:
+            print(f"[YouTube API WARNING] Gagal mengikat stream {stream_id} ({be}). Membuat Stream Ingestion baru...")
+            try:
+                stream_body = {
+                    "snippet": {
+                        "title": f"PosRonda Stream - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                    },
+                    "cdn": {
+                        "frameRate": "variable",
+                        "ingestionType": "rtmp",
+                        "resolution": "variable"
+                    }
+                }
+                stream_resp = self.service.liveStreams().insert(
+                    part="snippet,cdn",
+                    body=stream_body
+                ).execute()
+
+                stream_id = stream_resp["id"]
+                stream_name = stream_resp["cdn"]["ingestionInfo"]["streamName"]
+                ingestion_address = stream_resp["cdn"]["ingestionInfo"]["ingestionAddress"]
+
+                self.service.liveBroadcasts().bind(
+                    id=broadcast_id,
+                    streamId=stream_id,
+                    part="id,contentDetails"
+                ).execute()
+                print(f"[YouTube API] Berhasil membuat dan mengikat Stream Ingestion baru: {stream_id}")
+            except Exception as be2:
+                print(f"[YouTube API ERROR] Gagal bind stream baru: {be2}")
+                raise be2
 
         # 4. Masukkan ke Playlist target jika disetel
         if self.playlist_id:
@@ -756,19 +789,32 @@ class YouTubeManager:
         return self.wait_for_stream_and_transition(broadcast_id)
 
     def end_broadcast(self, broadcast_id):
-        """Mengakhiri siaran lama secara rapi agar diproses YouTube menjadi arsip video utuh"""
+        """Mengakhiri siaran lama secara rapi dan melepaskan ikatan stream agar siap untuk siaran berikutnya"""
         if not self.service:
             self.authenticate()
 
+        res = None
         try:
-            return self.service.liveBroadcasts().transition(
+            res = self.service.liveBroadcasts().transition(
                 broadcastStatus="complete",
                 id=broadcast_id,
                 part="status"
             ).execute()
+            print(f"[YouTube API] Siaran {broadcast_id} berhasil ditutup (complete).")
         except Exception as e:
-            print(f"Gagal menutup broadcast {broadcast_id}: {e}")
-            return None
+            print(f"[YouTube API] Info transisi complete {broadcast_id}: {e}")
+
+        # Unbind stream agar stream key bebas digunakan siaran berikutnya tanpa konflik
+        try:
+            self.service.liveBroadcasts().bind(
+                id=broadcast_id,
+                part="id,contentDetails"
+            ).execute()
+            print(f"[YouTube API] Stream berhasil di-unbind dari siaran {broadcast_id}.")
+        except Exception as ue:
+            print(f"[YouTube API] Info unbind stream {broadcast_id}: {ue}")
+
+        return res
 
     def append_description_timestamp(self, broadcast_id, timestamp_str, label):
         """Menambahkan bookmark timestamp ke deskripsi video live secara real-time"""

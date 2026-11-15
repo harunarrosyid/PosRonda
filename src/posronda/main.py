@@ -54,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.4.9"
+    __version__ = "4.5.0"
 
 class CCTVApp:
     def __init__(self, root):
@@ -831,12 +831,28 @@ class CCTVApp:
                     if now_elapsed >= target_limit_sec:
                         self.update_status(f"Batas {max_hours} jam tercapai. Menutup siaran lama & menyiapkan siaran baru...", is_live=False)
                         old_id = self.current_broadcast.get("broadcast_id")
-                        try:
-                            self.youtube_mgr.end_broadcast(old_id)
-                        except Exception as ee:
-                            print(f"[YouTube API] Info penutupan siaran lama: {ee}")
+
+                        # A. Hentikan pusher FFmpeg terlebih dahulu agar koneksi RTMP terputus bersih
+                        if self.pusher:
+                            self.pusher.stop()
+                            self.pusher = None
+                            if hasattr(self, "compositor"):
+                                self.compositor.update_settings(pusher=None)
+                        self.is_streaming = False
+
+                        # B. Tutup siaran lama di YouTube dan unbind stream key
+                        if old_id:
+                            try:
+                                self.youtube_mgr.end_broadcast(old_id)
+                            except Exception as ee:
+                                print(f"[YouTube API] Info penutupan siaran lama: {ee}")
+
                         self._clear_stream_state()
+                        self.current_broadcast = None
                         force_fresh = True
+
+                        # Jeda 4 detik agar pipeline server YouTube bersih sebelum memulai siaran baru
+                        time.sleep(4)
                         break
 
                 # 2. Pemantau Kesehatan FFmpeg (Anti-Bengong Watchdog)
@@ -909,6 +925,8 @@ class CCTVApp:
                     self.pusher = None
                     if hasattr(self, "compositor"):
                         self.compositor.update_settings(pusher=None)
+                self.is_streaming = False
+                self.current_broadcast = None
                 continue
 
             if self.restart_requested:
@@ -916,11 +934,18 @@ class CCTVApp:
                 if stream_mode == "youtube" and self.youtube_mgr and self.current_broadcast:
                     self.update_status("Menutup siaran lama untuk memulai siaran baru...", is_live=False)
                     old_id = self.current_broadcast.get("broadcast_id")
+                    if self.pusher:
+                        self.pusher.stop()
+                        self.pusher = None
+                        if hasattr(self, "compositor"):
+                            self.compositor.update_settings(pusher=None)
                     try:
                         self.youtube_mgr.end_broadcast(old_id)
                     except Exception:
                         pass
+                self.is_streaming = False
                 self._clear_stream_state()
+                self.current_broadcast = None
                 force_fresh = True
                 continue
 
@@ -999,8 +1024,8 @@ class CCTVApp:
         stream_mode = self.cfg.get("streaming", {}).get("mode", "youtube")
         mode_label = "Perekaman Lokal" if stream_mode == "local_recording" else ("Private Server" if stream_mode == "private_rtmp" else "YouTube")
 
-        # Jika mode YouTube dan stream key belum diatur:
-        if stream_mode == "youtube":
+        # Jika mode YouTube manual RTMP (tanpa API) dan stream key belum diatur:
+        if stream_mode == "youtube" and not self.cfg.get("youtube_api", {}).get("enabled", False):
             s_key = self.cfg.get("streaming", {}).get("stream_key", "").strip()
             if not s_key:
                 if messagebox.askyesno(
@@ -1019,6 +1044,13 @@ class CCTVApp:
         self.restart_requested = False
         self._api_quota_backoff_until = 0
         self.stream_start_time = time.time()
+
+        # Pastikan thread lifecycle aktif berjalan; jika mati, bangkitkan kembali
+        if not hasattr(self, "lifecycle_thread") or not self.lifecycle_thread.is_alive():
+            print("[Lifecycle] Membangkitkan kembali lifecycle thread streaming...")
+            self.lifecycle_thread = threading.Thread(target=self._youtube_lifecycle_loop, daemon=True)
+            self.lifecycle_thread.start()
+
         self.stream_trigger.set()
         self.update_status(f"Menghubungkan & memulai {mode_label}...", is_live=False)
 
