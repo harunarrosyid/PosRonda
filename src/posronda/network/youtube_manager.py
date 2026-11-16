@@ -576,36 +576,38 @@ class YouTubeManager:
         ingestion_address = None
 
         configured_key = (self.cfg.get("stream_key") or self.cfg.get("streaming", {}).get("stream_key") or "").strip()
-        try:
-            s_list = self.service.liveStreams().list(part="id,cdn", mine=True, maxResults=10).execute()
-            items = s_list.get("items", [])
-            # Jika user punya stream_key tertentu di config, prioritaskan yang cocok
-            if configured_key:
-                for s_item in items:
-                    ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
-                    if ing_info.get("streamName") == configured_key:
-                        stream_id = s_item["id"]
-                        stream_name = ing_info["streamName"]
-                        ingestion_address = ing_info.get("ingestionAddress", "rtmp://a.rtmp.youtube.com/live2")
-                        print(f"[YouTube API] Menggunakan Stream Ingestion sesuai konfigurasi: {stream_id}")
-                        break
-            # Jika belum ditemukan, gunakan ingestion yang ada
-            if not stream_id:
-                for s_item in items:
-                    ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
-                    if ing_info.get("streamName") and ing_info.get("ingestionAddress"):
-                        stream_id = s_item["id"]
-                        stream_name = ing_info["streamName"]
-                        ingestion_address = ing_info["ingestionAddress"]
-                        print(f"[YouTube API] Menggunakan Stream Ingestion yang sudah ada: {stream_id}")
-                        break
-        except Exception as le:
-            print(f"[YouTube API] Info cek stream existing: {le}")
+        # Jika force_new=True (sesi baru/rollover), jangan gunakan ingestion lama yang mungkin masih terikat siaran lama
+        if not force_new:
+            try:
+                s_list = self.service.liveStreams().list(part="id,cdn", mine=True, maxResults=10).execute()
+                items = s_list.get("items", [])
+                # Jika user punya stream_key tertentu di config, prioritaskan yang cocok
+                if configured_key:
+                    for s_item in items:
+                        ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
+                        if ing_info.get("streamName") == configured_key:
+                            stream_id = s_item["id"]
+                            stream_name = ing_info["streamName"]
+                            ingestion_address = ing_info.get("ingestionAddress", "rtmp://a.rtmp.youtube.com/live2")
+                            print(f"[YouTube API] Menggunakan Stream Ingestion sesuai konfigurasi: {stream_id}")
+                            break
+                # Jika belum ditemukan, gunakan ingestion yang ada
+                if not stream_id:
+                    for s_item in items:
+                        ing_info = s_item.get("cdn", {}).get("ingestionInfo", {})
+                        if ing_info.get("streamName") and ing_info.get("ingestionAddress"):
+                            stream_id = s_item["id"]
+                            stream_name = ing_info["streamName"]
+                            ingestion_address = ing_info["ingestionAddress"]
+                            print(f"[YouTube API] Menggunakan Stream Ingestion yang sudah ada: {stream_id}")
+                            break
+            except Exception as le:
+                print(f"[YouTube API] Info cek stream existing: {le}")
 
         if not stream_id:
             stream_body = {
                 "snippet": {
-                    "title": f"Stream Key untuk {title}"
+                    "title": f"PosRonda Stream - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
                 },
                 "cdn": {
                     "frameRate": "variable",
@@ -621,6 +623,7 @@ class YouTubeManager:
             stream_id = stream_resp["id"]
             stream_name = stream_resp["cdn"]["ingestionInfo"]["streamName"]
             ingestion_address = stream_resp["cdn"]["ingestionInfo"]["ingestionAddress"]
+            print(f"[YouTube API] Membuat Stream Ingestion mandiri baru: {stream_id}")
 
         # 3. Ikat (Bind) Broadcast ke Stream
         try:
@@ -765,8 +768,8 @@ class YouTubeManager:
 
                 # 3. Fallback Transisi Manual:
                 # Karena enableAutoStart: True, YouTube normalnya otomatis memulai siaran dalam 10-15 detik.
-                # Hanya jika stream_active sudah lama (attempt >= 6 / 18 detik) dan belum beralih ke live:
-                if stream_active and attempt >= 6 and not transition_attempted and b_status in ["ready", "testing"]:
+                # Hanya jika stream_active sudah lama (attempt >= 5 / 15 detik) dan belum beralih ke live:
+                if (stream_active or attempt >= 5) and not transition_attempted and b_status in ["ready", "testing"]:
                     transition_attempted = True
                     try:
                         self.service.liveBroadcasts().transition(
@@ -775,8 +778,23 @@ class YouTubeManager:
                             part="status"
                         ).execute()
                         print(f"[YouTube API] Transisi manual ke LIVE berhasil dikirim.")
+                        if on_live_callback:
+                            try:
+                                on_live_callback()
+                            except Exception as cbe:
+                                print(f"[YouTube API Callback Error] {cbe}")
+                        return True
                     except Exception as te:
+                        err_str = str(te).lower()
                         print(f"[YouTube API Transition Notice]: {te}")
+                        if "redundant" in err_str or "already" in err_str or "invalidtransition" in err_str:
+                            print(f"[YouTube API] Siaran terkonfirmasi sudah dalam status LIVE!")
+                            if on_live_callback:
+                                try:
+                                    on_live_callback()
+                                except Exception:
+                                    pass
+                            return True
 
             except Exception as e:
                 print(f"[YouTube API Polling Error] {e}")

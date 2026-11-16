@@ -54,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.5.1"
+    __version__ = "4.5.2"
 
 class CCTVApp:
     def __init__(self, root):
@@ -466,13 +466,16 @@ class CCTVApp:
         except Exception:
             pass
 
-    def _trigger_self_restart(self):
+    def _trigger_self_restart(self, clear_state=False):
         """
         Graceful Self-Restart: Me-restart proses aplikasi secara mandiri untuk memulihkan
         seluruh sumber daya sistem (Winsock, GPU driver, dan memori RAM) secara bersih.
         """
         print("[System] Menjalankan Graceful Self-Restart aplikasi PosRonda...")
-        if self.current_broadcast:
+        if clear_state:
+            self._clear_stream_state()
+            self.current_broadcast = None
+        elif self.current_broadcast:
             self._save_stream_state()
 
         try:
@@ -853,7 +856,7 @@ class CCTVApp:
                 if stream_mode == "youtube" and self.youtube_mgr and self.current_broadcast:
                     now_elapsed = time.time() - (self.stream_start_time or time.time())
                     if now_elapsed >= target_limit_sec:
-                        self.update_status(f"Batas {max_hours} jam tercapai. Menutup siaran lama & menyiapkan siaran baru...", is_live=False)
+                        self.update_status(f"Batas {max_hours} jam tercapai. Menutup siaran lama...", is_live=False)
                         old_id = self.current_broadcast.get("broadcast_id")
 
                         # A. Hentikan pusher FFmpeg terlebih dahulu agar koneksi RTMP terputus bersih
@@ -864,7 +867,7 @@ class CCTVApp:
                                 self.compositor.update_settings(pusher=None)
                         self.is_streaming = False
 
-                        # B. Tutup siaran lama di YouTube dan unbind stream key
+                        # B. Tutup siaran lama di YouTube agar terarsip utuh
                         if old_id:
                             try:
                                 self.youtube_mgr.end_broadcast(old_id)
@@ -873,11 +876,18 @@ class CCTVApp:
 
                         self._clear_stream_state()
                         self.current_broadcast = None
-                        force_fresh = True
 
-                        # Jeda 4 detik agar pipeline server YouTube bersih sebelum memulai siaran baru
-                        time.sleep(4)
-                        break
+                        # C. Graceful Auto-Restart Rollover (Anti-Freeze 2 Hari & Pemulihan Bersih 100%)
+                        auto_restart = stream_cfg.get("auto_restart_on_rollover", True)
+                        if auto_restart:
+                            self.update_status(f"Siaran lama diarsipkan. Me-restart PosRonda untuk siaran {max_hours} jam baru...", is_live=False)
+                            time.sleep(3)
+                            self._trigger_self_restart(clear_state=True)
+                            return
+                        else:
+                            force_fresh = True
+                            time.sleep(4)
+                            break
 
                 # 2. Pemantau Kesehatan FFmpeg (Anti-Bengong Watchdog)
                 pusher_alive = bool(

@@ -763,13 +763,14 @@ class GridCompositor(threading.Thread):
         self.gui_back_buffer = np.zeros((self.gh, self.gw, 3), dtype=np.uint8)
         self.has_new_gui_frame = False
 
-    def update_settings(self, cameras=None, pusher=None, fps=None, resolution=None, patrol_cfg=None):
+    def update_settings(self, cameras=None, pusher=False, fps=None, resolution=None, patrol_cfg=None):
         with self.lock:
             if cameras is not None:
                 self.cams = cameras
-            if pusher is not None:
+            if pusher is not False:
                 self.pusher = pusher
-                self.pusher.external_driver = True
+                if self.pusher:
+                    self.pusher.external_driver = True
             if fps is not None:
                 self.fps = fps
             if patrol_cfg is not None:

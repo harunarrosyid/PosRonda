@@ -1,7 +1,7 @@
 {
     "app_name": "PosRonda",
     "app_tagline": "Autonomous CCTV Multi-Camera Hub & YouTube Streaming Engine",
-    "version": "4.5.1",
+    "version": "4.5.2",
     "language": "id",
     "default_camera_credentials": {
         "username": "admin",
@@ -36,6 +36,7 @@
     ],
     "auto_discover_camera_ip": false,
     "streaming": {
+        "auto_restart_on_rollover": true,
         "rtmp_server": "rtmp://a.rtmp.youtube.com/live2",
         "stream_key": "",
         "max_duration_hours": 11,
