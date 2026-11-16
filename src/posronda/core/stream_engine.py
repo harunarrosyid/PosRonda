@@ -331,14 +331,22 @@ class FFmpegStreamPusher:
         custom_rtmp_url="",
         local_output_dir="recordings",
         segment_seconds=900,
-        retention_days=14
+        segment_minutes=None,
+        retention_days=14,
+        **kwargs
     ):
         self.mode = mode or "youtube"
         self.rtmp_url = rtmp_url or "rtmp://a.rtmp.youtube.com/live2"
         self.stream_key = stream_key or ""
         self.custom_rtmp_url = custom_rtmp_url or ""
         self.local_output_dir = local_output_dir or "recordings"
-        self.segment_seconds = segment_seconds or 900
+        if segment_minutes is not None:
+            try:
+                self.segment_seconds = int(segment_minutes) * 60
+            except Exception:
+                self.segment_seconds = segment_seconds or 900
+        else:
+            self.segment_seconds = segment_seconds or 900
         self.retention_days = retention_days or 14
         self.fps = fps
         self.bitrate = bitrate

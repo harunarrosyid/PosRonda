@@ -54,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.5.0"
+    __version__ = "4.5.1"
 
 class CCTVApp:
     def __init__(self, root):
@@ -488,6 +488,15 @@ class CCTVApp:
         except Exception:
             pass
 
+        # Lepaskan socket single instance lock agar proses restart tidak gagal bind port
+        global _single_instance_socket
+        try:
+            if _single_instance_socket:
+                _single_instance_socket.close()
+                _single_instance_socket = None
+        except Exception:
+            pass
+
         base_dir = config_manager.get_base_dir()
         launcher = os.path.join(base_dir, "run.py")
         if not os.path.exists(launcher):
@@ -512,6 +521,21 @@ class CCTVApp:
         os._exit(0)
 
     def _youtube_lifecycle_loop(self):
+        """
+        Thread master lifecycle transmisi streaming.
+        Dilengkapi pengawas fatal (Fatal Guard) yang menjamin thread tidak pernah mati
+        bahkan jika terjadi error tak terduga pada level sistem.
+        """
+        while True:
+            try:
+                self._internal_lifecycle_loop()
+            except Exception as fatal_e:
+                print(f"[Lifecycle Fatal Guard] Error tak terduga pada siklus streaming: {fatal_e}")
+                import traceback
+                traceback.print_exc()
+                time.sleep(3)
+
+    def _internal_lifecycle_loop(self):
         """
         Mengelola siklus transmisi video multi-tujuan:
         1. Mode YouTube Live (Standar 11 jam, Auto-Rollover, Upcoming Cleanup, Auto-Playlist, & State Resume)
@@ -555,7 +579,7 @@ class CCTVApp:
                     preset=preset,
                     mode="local_recording",
                     local_output_dir=rec_dir,
-                    segment_minutes=seg_mins,
+                    segment_seconds=int(seg_mins * 60),
                     retention_days=ret_days,
                     external_driver=True
                 )
@@ -870,33 +894,64 @@ class CCTVApp:
                     if consecutive_stream_drops <= 3:
                         # TIER 1: Soft Recovery (In-process restart FFmpeg dalam 3 detik)
                         self.update_status(f"[MENYAMBUNG ULANG] Terputus dari server, memulihkan stream ({consecutive_stream_drops}/3)...", is_live=False)
-                        if self.pusher:
-                            self.pusher.stop()
-                        time.sleep(3)
+                        try:
+                            if self.pusher:
+                                self.pusher.stop()
+                            time.sleep(3)
 
-                        self.pusher = FFmpegStreamPusher(
-                            rtmp_url=rtmp_url if stream_mode == "youtube" else (custom_url if stream_mode == "private_rtmp" else ""),
-                            stream_key=stream_key if stream_mode != "local_recording" else "",
-                            fps=fps,
-                            bitrate=bitrate,
-                            encoder=encoder,
-                            resolution=resolution,
-                            preset=preset,
-                            mode=stream_mode,
-                            custom_rtmp_url=custom_url if stream_mode == "private_rtmp" else "",
-                            local_output_dir=rec_dir if stream_mode == "local_recording" else "recordings",
-                            segment_minutes=seg_mins if stream_mode == "local_recording" else 15,
-                            retention_days=ret_days if stream_mode == "local_recording" else 14,
-                            external_driver=True
-                        )
-                        if hasattr(self, "compositor"):
-                            self.compositor.update_settings(pusher=self.pusher, fps=fps, resolution=resolution)
+                            if stream_mode == "local_recording":
+                                rec_cfg = stream_cfg.get("local_record", {})
+                                self.pusher = FFmpegStreamPusher(
+                                    fps=fps,
+                                    bitrate=bitrate,
+                                    encoder=encoder,
+                                    resolution=resolution,
+                                    preset=preset,
+                                    mode="local_recording",
+                                    local_output_dir=rec_cfg.get("output_dir", "recordings"),
+                                    segment_seconds=int(rec_cfg.get("segment_minutes", 15)) * 60,
+                                    retention_days=rec_cfg.get("retention_days", 14),
+                                    external_driver=True
+                                )
+                            elif stream_mode == "private_rtmp":
+                                c_url = stream_cfg.get("custom_rtmp_url", "")
+                                self.pusher = FFmpegStreamPusher(
+                                    rtmp_url=c_url,
+                                    stream_key=stream_key,
+                                    fps=fps,
+                                    bitrate=bitrate,
+                                    encoder=encoder,
+                                    resolution=resolution,
+                                    preset=preset,
+                                    mode="private_rtmp",
+                                    custom_rtmp_url=c_url,
+                                    external_driver=True
+                                )
+                            else:
+                                self.pusher = FFmpegStreamPusher(
+                                    rtmp_url=rtmp_url,
+                                    stream_key=stream_key,
+                                    fps=fps,
+                                    bitrate=bitrate,
+                                    encoder=encoder,
+                                    resolution=resolution,
+                                    preset=preset,
+                                    mode="youtube",
+                                    external_driver=True
+                                )
 
-                        if self.pusher.start():
-                            consecutive_stream_drops = 0
-                            self.pusher_start_time = time.time()
-                            self.update_status("Koneksi berhasil dipulihkan! Melanjutkan streaming...", is_live=True)
-                            continue
+                            if hasattr(self, "compositor"):
+                                self.compositor.update_settings(pusher=self.pusher, fps=fps, resolution=resolution)
+
+                            if self.pusher.start():
+                                consecutive_stream_drops = 0
+                                self.pusher_start_time = time.time()
+                                self.update_status("Koneksi berhasil dipulihkan! Melanjutkan streaming...", is_live=True)
+                                continue
+                            else:
+                                print(f"[Watchdog] Gagal memulai kembali FFmpeg pada percobaan {consecutive_stream_drops}")
+                        except Exception as rec_err:
+                            print(f"[Watchdog Recovery Error] Gagal memulihkan stream: {rec_err}")
                     else:
                         # TIER 2 & 3: Cek Internet & Self-Restart
                         from posronda.network.youtube_manager import check_internet_connection
