@@ -574,13 +574,20 @@ class FFmpegStreamPusher:
                 self.log_file = open(log_file_path, "w", encoding="utf-8")
 
                 print(f"[FFmpeg] Memulai engine [{self.mode}] dengan encoder: {enc} ({pre})...")
-                self.process = subprocess.Popen(
-                    cmd,
-                    stdin=subprocess.PIPE,
-                    stderr=self.log_file,
-                    stdout=subprocess.DEVNULL,
-                    bufsize=0
-                )
+                popen_kwargs = {
+                    "stdin": subprocess.PIPE,
+                    "stderr": self.log_file,
+                    "stdout": subprocess.DEVNULL,
+                    "bufsize": 0,
+                }
+                if sys.platform == "win32":
+                    popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0  # SW_HIDE
+                    popen_kwargs["startupinfo"] = startupinfo
+
+                self.process = subprocess.Popen(cmd, **popen_kwargs)
                 self.running = True
 
                 if not getattr(self, "external_driver", True):

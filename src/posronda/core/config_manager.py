@@ -218,10 +218,19 @@ def set_autostart(enable=True):
         )
         import subprocess
         try:
+            run_kwargs = {
+                "check": True,
+                "capture_output": True
+            }
+            if sys.platform == "win32":
+                run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+                run_kwargs["startupinfo"] = startupinfo
             subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-                check=True,
-                capture_output=True
+                **run_kwargs
             )
             print(f"[Auto-Start] Berhasil memasang shortcut startup: {path}")
             return True
