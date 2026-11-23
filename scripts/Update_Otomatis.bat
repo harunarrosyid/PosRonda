@@ -4,7 +4,7 @@ title Update Otomatis PosRonda Hub
 color 0B
 
 echo ========================================================
-echo        UPDATE OTOMATIS POSRONDA HUB v4.5.2
+echo        UPDATE OTOMATIS POSRONDA HUB v4.5.3
 echo ========================================================
 echo.
 
@@ -15,7 +15,7 @@ for /f "tokens=*" %%f in ('dir /b /o-d update_cctv*.zip update_posronda*.zip upd
 )
 
 color 0C
-echo [ERROR] File zip update (seperti update_cctv_v4.5.2.zip atau update_cctv.zip) tidak ditemukan!
+echo [ERROR] File zip update (seperti update_cctv_v4.5.3.zip atau update_cctv.zip) tidak ditemukan!
 echo.
 echo Pastikan Anda sudah meletakkan file zip update ke dalam folder ini.
 echo.

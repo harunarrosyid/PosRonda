@@ -54,7 +54,7 @@ except ImportError:
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.5.2"
+    __version__ = "4.5.3"
 
 class CCTVApp:
     def __init__(self, root):
@@ -709,9 +709,14 @@ class CCTVApp:
 
                                 if is_valid:
                                     broadcast_info = saved_state
-                                    self.stream_start_time = saved_start
+                                    api_epoch = b_stat.get("actualStartEpoch") if b_stat else None
+                                    if api_epoch and api_epoch > 0:
+                                        self.stream_start_time = api_epoch
+                                    else:
+                                        self.stream_start_time = saved_start
                                     resumed_existing = True
-                                    print(f"[YouTube API] State Resume: Melanjutkan siaran aktif '{broadcast_info.get('title')}' (Sudah berjalan {elapsed_prev/60:.1f} menit)")
+                                    elapsed_real = (time.time() - self.stream_start_time) / 60.0
+                                    print(f"[YouTube API] State Resume: Melanjutkan siaran aktif '{broadcast_info.get('title')}' (Sudah berjalan {elapsed_real:.1f} menit)")
                                 else:
                                     self._clear_stream_state()
                             else:
@@ -808,6 +813,15 @@ class CCTVApp:
                             def run_watcher():
                                 def on_live():
                                     def _apply_live():
+                                        try:
+                                            b_stat = self.youtube_mgr.get_broadcast_status(b_id) if self.youtube_mgr else None
+                                            if b_stat and b_stat.get("actualStartEpoch"):
+                                                self.stream_start_time = b_stat.get("actualStartEpoch")
+                                                if self.current_broadcast:
+                                                    self.current_broadcast["stream_start_time"] = self.stream_start_time
+                                                self._save_stream_state()
+                                        except Exception:
+                                            pass
                                         self.is_streaming = True
                                         start_str = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
                                         if self.current_broadcast:
@@ -851,12 +865,47 @@ class CCTVApp:
             # C. WATCHDOG HEARTBEAT LOOP (Anti-Bengong, Auto-Rollover 11 Jam, & Self-Healing)
             # ----------------------------------------------------
             consecutive_stream_drops = 0
+            last_api_sync_time = 0
             while self.streaming_enabled and not self.restart_requested:
-                # 1. Cek Rollover Batas Waktu 11 Jam (Khusus YouTube dengan API)
+                # 1. Sinkronisasi Angka Waktu Pasti & Verifikasi Status Real via YouTube API
                 if stream_mode == "youtube" and self.youtube_mgr and self.current_broadcast:
+                    b_id = self.current_broadcast.get("broadcast_id")
+                    now_ts = time.time()
+                    if b_id and (now_ts - last_api_sync_time >= 20.0):
+                        last_api_sync_time = now_ts
+                        try:
+                            b_stat = self.youtube_mgr.get_broadcast_status(b_id)
+                            if b_stat:
+                                life_cycle = b_stat.get("lifeCycleStatus")
+                                api_epoch = b_stat.get("actualStartEpoch")
+
+                                # Sinkronisasi angka waktu mulai nyata (actualStartTime) dari YouTube API
+                                if api_epoch and api_epoch > 0:
+                                    if not self.stream_start_time or abs(self.stream_start_time - api_epoch) > 3.0:
+                                        self.stream_start_time = api_epoch
+                                        if self.current_broadcast:
+                                            self.current_broadcast["stream_start_time"] = api_epoch
+                                        self._save_stream_state()
+
+                                # Verifikasi status siaran di YouTube agar tidak 'streaming halu'
+                                if life_cycle in ["live", "liveStarting"]:
+                                    if not self.is_streaming:
+                                        self.is_streaming = True
+                                        start_str = time.strftime('%H:%M:%S', time.localtime(self.stream_start_time or time.time()))
+                                        self.update_status(f"RESMI LIVE: {b_stat.get('title', 'PosRonda')} (Mulai {start_str} WIB)", is_live=True)
+                                elif life_cycle in ["complete", "revoked"]:
+                                    print(f"[YouTube API] Siaran {b_id} telah berstatus '{life_cycle}' di YouTube Studio! Mengakhiri siaran lama untuk memulai baru...")
+                                    self.is_streaming = False
+                                    break
+                                elif life_cycle in ["ready", "testing"] and self.pusher and self.pusher.running:
+                                    self.youtube_mgr.transition_to_live(b_id)
+                        except Exception as sync_e:
+                            print(f"[YouTube API Sync Warning] {sync_e}")
+
+                    # 2. Cek Rollover Batas Waktu 11 Jam Berdasarkan Angka Pasti (Anti-Kelewatan)
                     now_elapsed = time.time() - (self.stream_start_time or time.time())
                     if now_elapsed >= target_limit_sec:
-                        self.update_status(f"Batas {max_hours} jam tercapai. Menutup siaran lama...", is_live=False)
+                        self.update_status(f"Batas {max_hours} jam tercapai ({now_elapsed/3600:.1f} jam). Menutup siaran lama...", is_live=False)
                         old_id = self.current_broadcast.get("broadcast_id")
 
                         # A. Hentikan pusher FFmpeg terlebih dahulu agar koneksi RTMP terputus bersih

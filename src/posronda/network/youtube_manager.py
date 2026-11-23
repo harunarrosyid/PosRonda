@@ -362,7 +362,7 @@ class YouTubeManager:
             return None
 
     def get_broadcast_status(self, broadcast_id):
-        """Mengecek status siaran tertentu di YouTube (lifeCycleStatus, title, dsb)"""
+        """Mengecek status siaran tertentu di YouTube (lifeCycleStatus, title, actualStartTime, dsb)"""
         if not self.service:
             self.authenticate()
         try:
@@ -374,11 +374,26 @@ class YouTubeManager:
             if items:
                 status_info = items[0].get("status", {})
                 snippet_info = items[0].get("snippet", {})
+
+                actual_start = snippet_info.get("actualStartTime")
+                actual_start_epoch = None
+                if actual_start:
+                    try:
+                        import datetime
+                        # Format ISO 8601 UTC: '2026-11-23T02:15:30Z' -> '+00:00'
+                        dt = datetime.datetime.fromisoformat(actual_start.replace("Z", "+00:00"))
+                        actual_start_epoch = dt.timestamp()
+                    except Exception:
+                        pass
+
                 return {
                     "id": items[0]["id"],
                     "title": snippet_info.get("title", ""),
                     "lifeCycleStatus": status_info.get("lifeCycleStatus"),
-                    "privacyStatus": status_info.get("privacyStatus")
+                    "privacyStatus": status_info.get("privacyStatus"),
+                    "actualStartTime": actual_start,
+                    "actualStartEpoch": actual_start_epoch,
+                    "scheduledStartTime": snippet_info.get("scheduledStartTime")
                 }
             return None
         except Exception as e:
@@ -527,6 +542,21 @@ class YouTubeManager:
         """Membuat Live Broadcast baru di YouTube (Dioptimasi hemat kuota API)"""
         if not self.service:
             self.authenticate()
+
+        # 0. Single Stream Enforcer: Tutup seluruh siaran live lama yang masih menggantung
+        # agar TIDAK PERNAH ADA 2 siaran live bersamaan di channel YouTube (Anti-Double Streaming)!
+        try:
+            print("[YouTube API] Single Stream Enforcer: Menutup siaran live lama yang menggantung...")
+            self.cleanup_active_live_broadcasts(only_cctv_prefix=False)
+            time.sleep(1)
+        except Exception as cle:
+            print(f"[YouTube API] Info pembersihan live aktif lama: {cle}")
+
+        # Bersihkan juga sisa upcoming lama yang menumpuk
+        try:
+            self.cleanup_all_upcoming(only_cctv_prefix=True)
+        except Exception as cue:
+            print(f"[YouTube API] Info pembersihan upcoming lama: {cue}")
 
         now_local = datetime.datetime.now()
         now_utc = datetime.datetime.now(datetime.timezone.utc)
