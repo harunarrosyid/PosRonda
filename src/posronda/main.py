@@ -39,7 +39,7 @@ for sub in ["core", "network", "ui", "utils"]:
 try:
     from posronda.core import config_manager
     from posronda.core.license_manager import LicenseManager
-    from posronda.core.stream_engine import RTSPCameraWorker, FFmpegStreamPusher, GridCompositor
+    from posronda.core.stream_engine import RTSPCameraWorker, FFmpegStreamPusher, GridCompositor, AudioMonitorWorker, check_rtsp_audio
     from posronda.ui.settings_dialog import SettingsDialog
     from posronda.network.notifier import TelegramNotifier
     from posronda.utils import check_env
@@ -47,14 +47,14 @@ except ImportError:
     import check_env
     import config_manager
     from license_manager import LicenseManager
-    from stream_engine import RTSPCameraWorker, FFmpegStreamPusher, GridCompositor
+    from stream_engine import RTSPCameraWorker, FFmpegStreamPusher, GridCompositor, AudioMonitorWorker, check_rtsp_audio
     from settings_dialog import SettingsDialog
     from notifier import TelegramNotifier
 
 try:
     from posronda import __version__
 except Exception:
-    __version__ = "4.5.4"
+    __version__ = "4.6.0"
 
 class CCTVApp:
     def __init__(self, root):
@@ -82,6 +82,7 @@ class CCTVApp:
         self.current_broadcast = None
         self.pusher = None
         self.is_fullscreen = False
+        self.audio_worker = AudioMonitorWorker()
 
         # Inisialisasi Worker Kamera
         self.cams = []
@@ -300,10 +301,12 @@ class CCTVApp:
         self.root.bind("<Tab>", lambda e: self.switch_camera_page())
         self.root.bind("<Prior>", lambda e: self.prev_camera_page())
         self.root.bind("<Next>", lambda e: self.switch_camera_page())
-        self.root.bind("1", lambda e: self.select_camera_page(0))
-        self.root.bind("2", lambda e: self.select_camera_page(1))
-        self.root.bind("3", lambda e: self.select_camera_page(2))
-        self.root.bind("4", lambda e: self.select_camera_page(3))
+        self.root.bind("1", lambda e: self.select_camera_audio_or_page(0))
+        self.root.bind("2", lambda e: self.select_camera_audio_or_page(1))
+        self.root.bind("3", lambda e: self.select_camera_audio_or_page(2))
+        self.root.bind("4", lambda e: self.select_camera_audio_or_page(3))
+        self.root.bind("<m>", lambda e: self.mute_audio())
+        self.root.bind("<M>", lambda e: self.mute_audio())
 
         # Event Trigger untuk Reset / Mulai Ulang Stream Seketika
         self.stream_trigger = threading.Event()
@@ -490,6 +493,12 @@ class CCTVApp:
                     pass
         except Exception:
             pass
+
+        if hasattr(self, "audio_worker") and self.audio_worker:
+            try:
+                self.audio_worker.stop()
+            except Exception:
+                pass
 
         # Lepaskan socket single instance lock agar proses restart tidak gagal bind port
         global _single_instance_socket
@@ -1247,21 +1256,104 @@ class CCTVApp:
             self.lbl_status_text.config(text=f"Merefresh & menghubungkan ulang {cam.name}...")
 
     def on_canvas_single_tap(self, event):
-        """Jika kamera sedang OFFLINE / Gagal Konek / Putus, sekali klik langsung memicu refresh"""
+        """
+        Klik 1x pada layar kamera:
+        - Jika kamera sedang OFFLINE / Gagal Konek / Putus: memicu reconnect seketika.
+        - Jika kamera ONLINE: Mengaktifkan / mematikan Active Audio Focus (Dengarkan suara kamera di speaker laptop).
+        """
         cam_idx, cam = self._get_camera_at_pos(event.x, event.y)
-        if cam and cam.status != "ONLINE":
-            print(f"[UI] Tap terdeteksi pada {cam.name} ({cam.status}). Memulai reconnect...")
-            cam.refresh()
-            self.lbl_status_text.config(text=f"Menghubungkan ulang {cam.name}...")
+        if cam:
+            if cam.status != "ONLINE":
+                print(f"[UI] Tap terdeteksi pada {cam.name} ({cam.status}). Memulai reconnect...")
+                cam.refresh()
+                self.lbl_status_text.config(text=f"Menghubungkan ulang {cam.name}...")
+            else:
+                self.toggle_camera_audio(cam)
+
+    def toggle_camera_audio(self, cam):
+        """Mengaktifkan / beralih / mematikan audio pemantauan kamera ke speaker laptop"""
+        if not hasattr(self, "audio_worker") or not self.audio_worker:
+            return
+        is_playing, msg = self.audio_worker.toggle(cam.cam_id, cam.name, cam.rtsp_url)
+        active_id = cam.cam_id if is_playing else None
+        if hasattr(self, "compositor"):
+            self.compositor.set_active_audio_cam(active_id)
+        if is_playing:
+            self.lbl_status_text.config(text=f"[AUDIO AKTIF] Mendengarkan {cam.name} di speaker laptop (Klik lagi atau tekan M untuk Mute)")
+        else:
+            self.lbl_status_text.config(text=f"[AUDIO MUTE] {msg}. Klik kamera 1, 2, 3, atau 4 untuk dengarkan audio.")
+
+    def mute_audio(self):
+        """Mematikan seluruh pemutaran audio (Mute)"""
+        if hasattr(self, "audio_worker") and self.audio_worker:
+            self.audio_worker.stop()
+        if hasattr(self, "compositor"):
+            self.compositor.set_active_audio_cam(None)
+        self.lbl_status_text.config(text="[AUDIO MUTE] Pemantauan audio dinonaktifkan (Mute).")
+
+    def select_camera_audio_or_page(self, slot_idx):
+        """Memilih kamera 1, 2, 3, 4 untuk audio (jika 1 halaman) atau berpindah halaman patrol"""
+        total_pages = getattr(self.compositor, "total_pages", 1) if hasattr(self, "compositor") else 1
+        cams_per_page = getattr(self.compositor, "cams_per_page", 4) if hasattr(self, "compositor") else 4
+        cur_page = getattr(self.compositor, "current_page", 0) if hasattr(self, "compositor") else 0
+
+        target_idx = cur_page * cams_per_page + slot_idx
+        if 0 <= target_idx < len(self.cams):
+            self.toggle_camera_audio(self.cams[target_idx])
+        elif total_pages > 1 and 0 <= slot_idx < total_pages:
+            self.select_camera_page(slot_idx)
+
+    def diagnose_camera_audio(self, cam):
+        """Menjalankan diagnosa ffprobe di background untuk mengecek apakah stream RTSP kamera memuat track audio"""
+        from tkinter import messagebox
+        self.lbl_status_text.config(text=f"Mendiagnosa stream audio RTSP {cam.name}...")
+
+        def _run_diag():
+            has_audio, detail = check_rtsp_audio(cam.rtsp_url)
+            def _show():
+                if has_audio:
+                    messagebox.showinfo(
+                        "Diagnosa Audio RTSP - BERHASIL",
+                        f"Kamera: {cam.name}\n"
+                        f"URL: {cam.rtsp_url}\n\n"
+                        f"Hasil: AUDIO TERDETEKSI DI RTSP!\n\n"
+                        f"Detail Track Audio:\n{detail}\n\n"
+                        f"Audio kamera ini siap didengarkan langsung di speaker laptop saat Anda mengklik layarnya.",
+                        parent=self.root
+                    )
+                else:
+                    messagebox.showwarning(
+                        "Diagnosa Audio RTSP - AUDIO TERKUNCI / KOSONG",
+                        f"Kamera: {cam.name}\n"
+                        f"URL: {cam.rtsp_url}\n\n"
+                        f"Hasil: {detail}\n\n"
+                        f"Mengapa audionya belum ada?\n"
+                        f"1. Sebagian kamera IP menyetel profil RTSP ke mode 'Video Only' (bawaan pabrik).\n"
+                        f"2. Buka aplikasi bawaan di HP (V380 / iCSee / Yoosee) atau Web UI kamera.\n"
+                        f"3. Masuk ke Pengaturan Rekaman/Video/Encode.\n"
+                        f"4. Ubah 'Stream Type' menjadi 'Video & Audio' dan aktifkan 'Audio Record/Stream'.\n"
+                        f"5. Setelah disimpan, audio akan langsung mengalir ke RTSP dan PosRonda.",
+                        parent=self.root
+                    )
+                self.lbl_status_text.config(text=f"Diagnosa audio {cam.name} selesai.")
+            self.root.after(0, _show)
+
+        threading.Thread(target=_run_diag, daemon=True).start()
 
     def on_canvas_right_click(self, event):
         """Menu klik-kanan cepat untuk kendali kamera individual"""
         cam_idx, cam = self._get_camera_at_pos(event.x, event.y)
         menu = tk.Menu(self.root, tearoff=0, bg="#1e293b", fg="#e2e8f0", activebackground="#3b82f6", activeforeground="#ffffff")
         if cam:
+            is_active_audio = getattr(self.audio_worker, "active_cam_id", None) == cam.cam_id if hasattr(self, "audio_worker") else False
+            audio_lbl = f"Matikan Audio {cam.name} (Mute)" if is_active_audio else f"Dengarkan Audio {cam.name} (Klik Layar)"
+            menu.add_command(label=audio_lbl, command=lambda: self.toggle_camera_audio(cam))
+            menu.add_command(label=f"Diagnosa Audio RTSP {cam.name}", command=lambda: self.diagnose_camera_audio(cam))
+            menu.add_separator()
             menu.add_command(label=f"Refresh {cam.name} (Tap 2x)", command=lambda: self._refresh_single_camera(cam))
             menu.add_separator()
         menu.add_command(label=f"Refresh Seluruh Kamera ({len(self.cams)})", command=self.refresh_all_cameras)
+        menu.add_command(label="Matikan Seluruh Audio (M)", command=self.mute_audio)
         menu.add_command(label="Ganti Halaman Kamera (Spasi)", command=self.switch_camera_page)
         menu.add_separator()
         menu.add_command(label="Pengaturan CCTV (F2)", command=self.open_settings)
@@ -1562,6 +1654,8 @@ class CCTVApp:
 
     def on_closing(self):
         # Bersihkan semua proses saat aplikasi ditutup
+        if hasattr(self, "audio_worker") and self.audio_worker:
+            self.audio_worker.stop()
         if hasattr(self, "compositor"):
             self.compositor.stop()
         for c in self.cams:

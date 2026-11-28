@@ -184,7 +184,7 @@ def show_env_gui(py_ok, py_msg, ffmpeg_ok, ffmpeg_msg):
     # Panduan singkat
     footer_text = (
         "Tips: Saat menginstall Python, pastikan mencentang [X] 'Add python.exe to PATH'\n"
-        "Setelah mengunduh FFmpeg, taruh file 'ffmpeg.exe' di satu folder dengan aplikasi ini."
+        "Setelah mengunduh FFmpeg, taruh 'ffmpeg.exe', 'ffplay.exe', dan 'ffprobe.exe' di folder aplikasi ini."
     )
     lbl_footer = tk.Label(root, text=footer_text, font=("Segoe UI", 8), bg="#1e1e24", fg="#94a3b8")
     lbl_footer.pack(pady=10)

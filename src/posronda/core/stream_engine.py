@@ -36,6 +36,193 @@ def _get_base_dir():
         return root_candidate
     return cwd
 
+def find_binary(binary_name="ffmpeg"):
+    """
+    Mencari executable binary (ffmpeg, ffplay, ffprobe) dengan urutan prioritas:
+    1. sys._MEIPASS (jika dibundle PyInstaller)
+    2. Folder aplikasi dan subfolder (bin/, ffmpeg/bin/, ffmpeg/)
+    3. Folder yang sama dengan ffmpeg yang terdeteksi di sistem
+    4. System PATH via shutil.which
+    """
+    ext = ".exe" if sys.platform == "win32" else ""
+    target_file = f"{binary_name}{ext}"
+    base_dir = _get_base_dir()
+
+    if hasattr(sys, "_MEIPASS"):
+        meipass_p = os.path.join(sys._MEIPASS, target_file)
+        if os.path.exists(meipass_p):
+            return meipass_p
+
+    local_candidates = [
+        os.path.join(base_dir, target_file),
+        os.path.join(base_dir, "bin", target_file),
+        os.path.join(base_dir, "ffmpeg", "bin", target_file),
+        os.path.join(base_dir, "ffmpeg", target_file),
+    ]
+
+    if binary_name != "ffmpeg":
+        ff_found = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+        if ff_found:
+            ff_dir = os.path.dirname(ff_found)
+            local_candidates.append(os.path.join(ff_dir, target_file))
+
+    for cand in local_candidates:
+        if os.path.exists(cand):
+            return cand
+
+    return shutil.which(target_file) or shutil.which(binary_name) or None
+
+def check_rtsp_audio(rtsp_url, timeout=5):
+    """
+    Mengecek secara mendalam apakah URL RTSP memancarkan stream audio menggunakan ffprobe.
+    Mengembalikan (has_audio: bool, detail: str).
+    """
+    ffprobe_bin = find_binary("ffprobe")
+    if not ffprobe_bin:
+        return False, "ffprobe.exe belum terpasang di folder aplikasi (salin dari zip ffmpeg)"
+
+    cmd = [
+        ffprobe_bin,
+        "-v", "error",
+        "-select_streams", "a",
+        "-show_entries", "stream=codec_name,sample_rate,channels",
+        "-of", "default=noprint_wrappers=1",
+        "-rtsp_transport", "tcp",
+        "-i", rtsp_url.strip()
+    ]
+
+    popen_kwargs = {
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "text": True,
+        "timeout": timeout
+    }
+    if sys.platform == "win32":
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
+    try:
+        res = subprocess.run(cmd, **popen_kwargs)
+        out = (res.stdout or "").strip()
+        if "codec_name=" in out:
+            return True, out
+        err = (res.stderr or "").strip()
+        if err:
+            return False, f"Stream RTSP tidak memuat track audio ({err[:80]})"
+        return False, "Kamera ini tidak memancarkan paket audio pada stream RTSP"
+    except subprocess.TimeoutExpired:
+        return False, "Waktu koneksi ffprobe habis (Kamera tidak merespon RTSP DESCRIBE audio)"
+    except Exception as e:
+        return False, f"Gagal mengecek audio: {e}"
+
+def _draw_audio_indicator(img, x1, y1, x2, y2, cam_name):
+    """Menggambar border penanda dan badge [AUDIO AKTIF] pada kamera yang sedang dipantau audionya"""
+    try:
+        # Border hijau zamrud (emerald) 2px
+        cv2.rectangle(img, (x1 + 1, y1 + 1), (x2 - 1, y2 - 1), (0, 230, 118), 2)
+        badge_text = f"AUDIO: {cam_name}"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.40
+        (tw, th), _ = cv2.getTextSize(badge_text, font, scale, 1)
+        bx2 = x2 - 8
+        bx1 = bx2 - tw - 10
+        by1 = y1 + 8
+        by2 = by1 + th + 6
+        cv2.rectangle(img, (bx1, by1), (bx2, by2), (15, 23, 42), -1)
+        cv2.rectangle(img, (bx1, by1), (bx2, by2), (0, 230, 118), 1)
+        cv2.putText(img, badge_text, (bx1 + 5, by2 - 3), font, scale, (240, 253, 250), 1, cv2.LINE_AA)
+    except Exception:
+        pass
+
+class AudioMonitorWorker:
+    """
+    Pemutar Audio Kamera RTSP Latar Belakang (Active Audio Focus).
+    Memungkinkan petugas ronda mendengarkan suara dari kamera 1, 2, 3, atau 4
+    langsung ke speaker laptop dengan latensi rendah (< 200ms) tanpa membebani CPU.
+    """
+    def __init__(self):
+        self.process = None
+        self.active_cam_id = None
+        self.active_cam_name = None
+        self.lock = threading.Lock()
+
+    def play(self, cam_id, cam_name, rtsp_url):
+        with self.lock:
+            self.stop_locked()
+
+            if not rtsp_url or not rtsp_url.strip().startswith("rtsp://"):
+                return False, f"URL RTSP {cam_name} kosong atau tidak valid"
+
+            ffplay_bin = find_binary("ffplay")
+            if not ffplay_bin:
+                msg = "ffplay.exe belum terpasang (salin dari zip ffmpeg ke folder aplikasi)."
+                print(f"[Audio Monitor WARNING] {msg}")
+                return False, msg
+
+            cmd = [
+                ffplay_bin,
+                "-nodisp",
+                "-vn",
+                "-volume", "100",
+                "-rtsp_transport", "tcp",
+                "-fflags", "nobuffer",
+                "-flags", "low_delay",
+                "-loglevel", "quiet",
+                rtsp_url.strip()
+            ]
+
+            popen_kwargs = {
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+                "stdin": subprocess.DEVNULL,
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0  # SW_HIDE
+                popen_kwargs["startupinfo"] = startupinfo
+
+            try:
+                self.process = subprocess.Popen(cmd, **popen_kwargs)
+                self.active_cam_id = cam_id
+                self.active_cam_name = cam_name
+                print(f"[Audio Monitor] Memutar audio {cam_name} (ID: {cam_id}) ke speaker laptop.")
+                return True, f"Audio {cam_name} aktif"
+            except Exception as e:
+                print(f"[Audio Monitor ERROR] Gagal memulai audio {cam_name}: {e}")
+                self.process = None
+                self.active_cam_id = None
+                self.active_cam_name = None
+                return False, str(e)
+
+    def stop_locked(self):
+        if self.process:
+            try:
+                self.process.terminate()
+                self.process.kill()
+            except Exception:
+                pass
+            self.process = None
+        self.active_cam_id = None
+        self.active_cam_name = None
+
+    def stop(self):
+        """Menghentikan pemutaran audio (Mute)"""
+        with self.lock:
+            self.stop_locked()
+            print("[Audio Monitor] Audio dinonaktifkan (Mute).")
+
+    def toggle(self, cam_id, cam_name, rtsp_url):
+        with self.lock:
+            if self.active_cam_id == cam_id and self.process and self.process.poll() is None:
+                self.stop_locked()
+                return False, "Audio dimatikan (Mute)"
+        return self.play(cam_id, cam_name, rtsp_url)
+
+    def is_active(self):
+        with self.lock:
+            return bool(self.process and self.process.poll() is None and self.active_cam_id is not None)
+
 def draw_patrol_badge(img, text):
     """Menggambar badge halaman patrol di bagian atas tengah kanvas"""
     h, w = img.shape[:2]
@@ -518,31 +705,8 @@ class FFmpegStreamPusher:
         else: # "youtube"
             target = f"{self.rtmp_url.rstrip('/')}/{self.stream_key}"
 
-        # Prioritas pemilihan binary FFmpeg:
-        # 0. Internal bundle jika dibundle PyInstaller (sys._MEIPASS)
-        # 1. Folder lokal PosRonda (ffmpeg.exe atau ffmpeg/bin/ffmpeg.exe)
-        # 2. System PATH di komputer / laptop user (shutil.which)
-        # 3. Default fallback "ffmpeg"
-        ffmpeg_bin = None
-        if hasattr(sys, "_MEIPASS"):
-            meipass_ff = os.path.join(sys._MEIPASS, "ffmpeg.exe")
-            if os.path.exists(meipass_ff):
-                ffmpeg_bin = meipass_ff
-
-        if not ffmpeg_bin:
-            local_candidates = [
-                os.path.join(base_dir, "ffmpeg.exe"),
-                os.path.join(base_dir, "ffmpeg", "bin", "ffmpeg.exe"),
-                os.path.join(base_dir, "bin", "ffmpeg.exe"),
-            ]
-            for cand in local_candidates:
-                if os.path.exists(cand):
-                    ffmpeg_bin = cand
-                    break
-
-        if not ffmpeg_bin:
-            ffmpeg_bin = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe") or "ffmpeg"
-
+        # Prioritas pemilihan binary FFmpeg (Bundle, Lokal, Subfolder, atau PATH)
+        ffmpeg_bin = find_binary("ffmpeg") or "ffmpeg"
         log_file_path = os.path.join(base_dir, "ffmpeg_log.txt")
 
         try:
@@ -740,6 +904,7 @@ class GridCompositor(threading.Thread):
         self.layout = self.patrol_cfg.get("layout", "2x2")
         self.current_page = 0
         self.last_page_time = time.time()
+        self.active_audio_cam_id = None
 
         self._calc_dims()
 
@@ -813,6 +978,10 @@ class GridCompositor(threading.Thread):
                 return self.current_page, self.total_pages
             return self.current_page, self.total_pages
 
+    def set_active_audio_cam(self, cam_id):
+        with self.lock:
+            self.active_audio_cam_id = cam_id
+
     def get_page_info(self):
         with self.lock:
             return self.current_page, self.total_pages, self.patrol_enabled
@@ -862,6 +1031,7 @@ class GridCompositor(threading.Thread):
 
             # 1. Salin tile kamera ke slice composite_grid
             try:
+                active_audio_id = self.active_audio_cam_id
                 if layout == "3x3":
                     for idx, cam in enumerate(page_cams):
                         r = idx // 3
@@ -871,15 +1041,25 @@ class GridCompositor(threading.Thread):
                         x1 = c * tile_w
                         x2 = (c + 1) * tile_w if c < 2 else gw
                         cam.get_frame_direct(self.grid_bgr[y1:y2, x1:x2])
+                        if active_audio_id is not None and active_audio_id == cam.cam_id:
+                            _draw_audio_indicator(self.grid_bgr, x1, y1, x2, y2, cam.name)
                 else:
                     if len(page_cams) > 0:
                         page_cams[0].get_frame_direct(self.grid_bgr[0:tile_h, 0:tile_w])
+                        if active_audio_id is not None and active_audio_id == page_cams[0].cam_id:
+                            _draw_audio_indicator(self.grid_bgr, 0, 0, tile_w, tile_h, page_cams[0].name)
                     if len(page_cams) > 1:
                         page_cams[1].get_frame_direct(self.grid_bgr[0:tile_h, tile_w:gw])
+                        if active_audio_id is not None and active_audio_id == page_cams[1].cam_id:
+                            _draw_audio_indicator(self.grid_bgr, tile_w, 0, gw, tile_h, page_cams[1].name)
                     if len(page_cams) > 2:
                         page_cams[2].get_frame_direct(self.grid_bgr[tile_h:gh, 0:tile_w])
+                        if active_audio_id is not None and active_audio_id == page_cams[2].cam_id:
+                            _draw_audio_indicator(self.grid_bgr, 0, tile_h, tile_w, gh, page_cams[2].name)
                     if len(page_cams) > 3:
                         page_cams[3].get_frame_direct(self.grid_bgr[tile_h:gh, tile_w:gw])
+                        if active_audio_id is not None and active_audio_id == page_cams[3].cam_id:
+                            _draw_audio_indicator(self.grid_bgr, tile_w, tile_h, gw, gh, page_cams[3].name)
 
                 if total_pages > 1:
                     draw_patrol_badge(
